@@ -55,16 +55,25 @@ const CATEGORY_META = {
 };
 
 export default function ProductsPage({ initialCategory = 'Indian Spices', onSelectProduct, onOpenQuote }) {
-  const defaultCategory = (initialCategory && CATEGORY_META[initialCategory]) ? initialCategory : 'Indian Spices';
-  const [activeTab, setActiveTab] = useState(defaultCategory);
+  const getValidCategory = (cat) => {
+    if (!cat || cat === 'All') return 'Indian Spices';
+    if (CATEGORY_META[cat]) return cat;
+    const lower = String(cat).toLowerCase();
+    if (lower.includes('spice') || lower.includes('ground') || lower.includes('whole') || lower.includes('seed') || lower.includes('masala')) return 'Indian Spices';
+    if (lower.includes('agro') || lower.includes('grain') || lower.includes('rice') || lower.includes('pulse')) return 'Agro Commodities';
+    if (lower.includes('machin')) return 'Machinery';
+    if (lower.includes('pipe')) return 'Pipes';
+    return 'Indian Spices';
+  };
+
+  const [activeTab, setActiveTab] = useState(() => getValidCategory(initialCategory));
   const [activeSubcategory, setActiveSubcategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
 
   // Sync if initialCategory prop changes from navbar click
   useEffect(() => {
     if (initialCategory) {
-      const target = CATEGORY_META[initialCategory] ? initialCategory : 'Indian Spices';
-      setActiveTab(target);
+      setActiveTab(getValidCategory(initialCategory));
       setActiveSubcategory('All');
     }
   }, [initialCategory]);
@@ -91,7 +100,16 @@ export default function ProductsPage({ initialCategory = 'Indian Spices', onSele
       // Check category match
       const matchesCategory = q ? true : (
         cat.toLowerCase() === activeTab.toLowerCase() || 
-        subcat.toLowerCase() === activeTab.toLowerCase()
+        subcat.toLowerCase() === activeTab.toLowerCase() ||
+        (activeTab === 'Indian Spices' && (
+          cat.toLowerCase().includes('spice') || 
+          subcat.toLowerCase().includes('spice') ||
+          subcat.toLowerCase().includes('ground') ||
+          subcat.toLowerCase().includes('whole') ||
+          subcat.toLowerCase().includes('seed') ||
+          subcat.toLowerCase().includes('blend') ||
+          subcat.toLowerCase().includes('exotic')
+        ))
       );
 
       // Check subcategory filter match if active
@@ -126,7 +144,19 @@ export default function ProductsPage({ initialCategory = 'Indian Spices', onSele
       const subcat = String(p.subcategory || '');
       
       PRODUCT_CATEGORIES.forEach(c => {
-        if (cat.toLowerCase() === c.toLowerCase() || subcat.toLowerCase() === c.toLowerCase()) {
+        if (
+          cat.toLowerCase() === c.toLowerCase() || 
+          subcat.toLowerCase() === c.toLowerCase() ||
+          (c === 'Indian Spices' && (
+            cat.toLowerCase().includes('spice') || 
+            subcat.toLowerCase().includes('spice') ||
+            subcat.toLowerCase().includes('ground') ||
+            subcat.toLowerCase().includes('whole') ||
+            subcat.toLowerCase().includes('seed') ||
+            subcat.toLowerCase().includes('blend') ||
+            subcat.toLowerCase().includes('exotic')
+          ))
+        ) {
           counts[c] = (counts[c] || 0) + 1;
         }
       });
@@ -616,14 +646,14 @@ export default function ProductsPage({ initialCategory = 'Indian Spices', onSele
               Try adjusting your search keyword or selecting another spice category tab.
             </p>
             <button
-              onClick={() => { setActiveTab('Ground Spices'); setSearchTerm(''); }}
+              onClick={() => { setActiveTab('Indian Spices'); setActiveSubcategory('All'); setSearchTerm(''); }}
               className="btn btn-primary"
               style={{
                 padding: '10px 24px',
                 fontSize: '14px'
               }}
             >
-              Explore Ground Spices
+              Explore Indian Spices
             </button>
           </div>
         )}
