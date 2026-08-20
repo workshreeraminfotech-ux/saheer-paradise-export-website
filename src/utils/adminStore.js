@@ -8,13 +8,10 @@ import {
   fetchCollectionFromCloud, 
   saveDocToCloud, 
   deleteDocFromCloud, 
-  getCloudConfig, 
-  saveCloudConfig, 
-  testCloudConnection, 
   syncAllToCloud 
 } from '../services/cloudService';
 
-export { getCloudConfig, saveCloudConfig, testCloudConnection, syncAllToCloud };
+export { syncAllToCloud };
 
 import apedaLogo from '../assets/certificate/apeda.png';
 import spicesBoardLogo from '../assets/certificate/spices board.png';
@@ -85,7 +82,7 @@ export function notifyStoreUpdate() {
 
 // Initial Sync from IndexedDB & LocalStorage & Firebase Cloud on startup
 if (typeof window !== 'undefined') {
-  // 1. Initial quick load from localStorage (if any)
+  // 1. Quick load from localStorage (if any)
   try {
     const lp = localStorage.getItem('marvex_products');
     if (lp) memoryProducts = JSON.parse(lp);
@@ -129,45 +126,52 @@ if (typeof window !== 'undefined') {
         notifyStoreUpdate();
       }
 
-      // 3. Load latest global dataset from Firebase Cloud Firestore (Permanent worldwide sync)
-      const cfg = getCloudConfig();
-      if (cfg && cfg.projectId && cfg.enabled) {
-        try {
-          const [cloudProds, cloudBlogs, cloudCerts, cloudEnqs] = await Promise.all([
-            fetchCollectionFromCloud('products', cfg),
-            fetchCollectionFromCloud('blogs', cfg),
-            fetchCollectionFromCloud('certificates', cfg),
-            fetchCollectionFromCloud('enquiries', cfg)
-          ]);
+      // 3. Load latest direct live dataset from Firebase Cloud Firestore (Permanent worldwide sync)
+      try {
+        const [cloudProds, cloudBlogs, cloudCerts, cloudEnqs] = await Promise.all([
+          fetchCollectionFromCloud('products'),
+          fetchCollectionFromCloud('blogs'),
+          fetchCollectionFromCloud('certificates'),
+          fetchCollectionFromCloud('enquiries')
+        ]);
 
-          let hasCloudUpdate = false;
-          if (cloudProds && Array.isArray(cloudProds) && cloudProds.length > 0) {
-            memoryProducts = cloudProds;
-            idbSet('marvex_products', cloudProds);
-            hasCloudUpdate = true;
-          }
-          if (cloudBlogs && Array.isArray(cloudBlogs) && cloudBlogs.length > 0) {
-            memoryBlogs = cloudBlogs;
-            idbSet('marvex_blogs', cloudBlogs);
-            hasCloudUpdate = true;
-          }
-          if (cloudCerts && Array.isArray(cloudCerts) && cloudCerts.length > 0) {
-            memoryCerts = cloudCerts;
-            idbSet('marvex_certs', cloudCerts);
-            hasCloudUpdate = true;
-          }
-          if (cloudEnqs && Array.isArray(cloudEnqs) && cloudEnqs.length > 0) {
-            memoryEnquiries = cloudEnqs;
-            idbSet('marvex_enquiries', cloudEnqs);
-            hasCloudUpdate = true;
-          }
-
-          if (hasCloudUpdate) {
-            notifyStoreUpdate();
-          }
-        } catch (cloudErr) {
-          console.warn('[Store] Cloud init sync skipped:', cloudErr);
+        let hasCloudUpdate = false;
+        if (cloudProds && Array.isArray(cloudProds) && cloudProds.length > 0) {
+          memoryProducts = cloudProds;
+          idbSet('marvex_products', cloudProds);
+          hasCloudUpdate = true;
+        } else if (cloudProds && Array.isArray(cloudProds) && cloudProds.length === 0) {
+          // Cloud is initialized fresh: auto-upload current default items to Firebase
+          const prodsToSeed = memoryProducts || INITIAL_PRODUCTS;
+          syncAllToCloud('products', prodsToSeed).catch(() => {});
         }
+
+        if (cloudBlogs && Array.isArray(cloudBlogs) && cloudBlogs.length > 0) {
+          memoryBlogs = cloudBlogs;
+          idbSet('marvex_blogs', cloudBlogs);
+          hasCloudUpdate = true;
+        } else if (cloudBlogs && Array.isArray(cloudBlogs) && cloudBlogs.length === 0) {
+          const blogsToSeed = memoryBlogs || INITIAL_BLOGS;
+          syncAllToCloud('blogs', blogsToSeed).catch(() => {});
+        }
+
+        if (cloudCerts && Array.isArray(cloudCerts) && cloudCerts.length > 0) {
+          memoryCerts = cloudCerts;
+          idbSet('marvex_certs', cloudCerts);
+          hasCloudUpdate = true;
+        }
+
+        if (cloudEnqs && Array.isArray(cloudEnqs) && cloudEnqs.length > 0) {
+          memoryEnquiries = cloudEnqs;
+          idbSet('marvex_enquiries', cloudEnqs);
+          hasCloudUpdate = true;
+        }
+
+        if (hasCloudUpdate) {
+          notifyStoreUpdate();
+        }
+      } catch (cloudErr) {
+        console.warn('[Store] Live Cloud sync skipped:', cloudErr);
       }
     } catch (e) {}
   })();

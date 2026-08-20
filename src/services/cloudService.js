@@ -1,9 +1,6 @@
-// Firebase Firestore Cloud Sync Service (Zero-Dependency REST Engine)
-// Provides instant cloud persistence for Saheer Paradise Exports admin changes across all devices & users worldwide.
+// Firebase Firestore Cloud Sync Engine (Zero-Dependency Direct REST Client)
+// Direct, seamless, real-time live synchronization for Saheer Paradise Exports
 
-const CLOUD_CONFIG_KEY = 'saheer_cloud_config';
-
-// Official Web App Firebase Config
 export const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDvf2-g190T5HapAl2lyy1aunVGmXq78sE",
   authDomain: "saheer-paradise-export.firebaseapp.com",
@@ -14,38 +11,23 @@ export const FIREBASE_CONFIG = {
   measurementId: "G-T5DTS5VJN5"
 };
 
-// Default / fallback cloud settings
-const DEFAULT_CONFIG = {
-  projectId: 'saheer-paradise-export',
-  apiKey: 'AIzaSyDvf2-g190T5HapAl2lyy1aunVGmXq78sE',
-  enabled: true
-};
+const PROJECT_ID = FIREBASE_CONFIG.projectId;
+const API_KEY = FIREBASE_CONFIG.apiKey;
 
-// Retrieve saved cloud configuration
-export function getCloudConfig() {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      const saved = localStorage.getItem(CLOUD_CONFIG_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return { ...DEFAULT_CONFIG, ...parsed, projectId: parsed.projectId || DEFAULT_CONFIG.projectId, apiKey: parsed.apiKey || DEFAULT_CONFIG.apiKey };
-      }
-    }
-  } catch (e) {}
-  return DEFAULT_CONFIG;
-}
-
-// Save cloud configuration
-export function saveCloudConfig(config) {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(CLOUD_CONFIG_KEY, JSON.stringify(config));
-    }
-  } catch (e) {}
+// Helper to construct authenticated Firestore URL
+function getFirestoreUrl(path, queryParams = '') {
+  let url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${path}`;
+  const params = new URLSearchParams();
+  if (API_KEY) params.append('key', API_KEY);
+  if (queryParams) {
+    const extra = new URLSearchParams(queryParams);
+    for (const [k, v] of extra.entries()) params.append(k, v);
+  }
+  const qs = params.toString();
+  return qs ? `${url}?${qs}` : url;
 }
 
 // --- FIRESTORE VALUE CONVERTERS ---
-// Helper: Convert JS object to Firestore Document fields structure
 function toFirestoreFields(obj) {
   const fields = {};
   for (const key of Object.keys(obj)) {
@@ -82,7 +64,6 @@ function toFirestoreFields(obj) {
   return fields;
 }
 
-// Helper: Convert Firestore Document fields back to standard JS object
 function fromFirestoreFields(fields) {
   if (!fields) return {};
   const obj = {};
@@ -114,54 +95,24 @@ function fromFirestoreFields(fields) {
   return obj;
 }
 
-// --- CLOUD API CALLS ---
+// --- DIRECT CLOUD DATABASE OPERATIONS ---
 
-// Test Firebase Connection
-export async function testCloudConnection(config = null) {
-  const cfg = config || getCloudConfig();
-  if (!cfg.projectId || !cfg.projectId.trim()) {
-    return { success: false, message: 'Firebase Project ID is required.' };
-  }
-
-  const projectId = cfg.projectId.trim();
-  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/_healthcheck`;
-
+// 1. Fetch All Documents from a Collection
+export async function fetchCollectionFromCloud(collectionName) {
+  const url = getFirestoreUrl(collectionName, 'pageSize=1000');
   try {
     const res = await fetch(url);
-    // 404 is okay (means database exists but document doesn't), 200 is okay
-    if (res.status === 200 || res.status === 404) {
-      return { success: true, message: 'Connected successfully to Firebase Cloud Firestore!' };
+    if (!res.ok) {
+      console.warn(`[Firebase] Fetch returned status ${res.status} for collection "${collectionName}"`);
+      return null;
     }
-    const errData = await res.json().catch(() => ({}));
-    return { 
-      success: false, 
-      message: errData.error?.message || `Firebase response error (${res.status}). Check Firestore database rules.` 
-    };
-  } catch (err) {
-    return { success: false, message: err.message || 'Network error connecting to Firebase.' };
-  }
-}
-
-// Fetch all documents from a Firestore collection
-export async function fetchCollectionFromCloud(collectionName, customConfig = null) {
-  const cfg = customConfig || getCloudConfig();
-  if (!cfg.projectId || !cfg.enabled) {
-    return null;
-  }
-
-  const projectId = cfg.projectId.trim();
-  // Fetch up to 300 documents from the collection
-  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionName}?pageSize=300`;
-
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
     const data = await res.json();
-    if (!data.documents || !Array.isArray(data.documents)) return [];
+    if (!data.documents || !Array.isArray(data.documents)) {
+      return [];
+    }
 
     return data.documents.map(doc => {
       const parsed = fromFirestoreFields(doc.fields);
-      // Extract document ID from path if missing
       if (!parsed.id) {
         const parts = doc.name.split('/');
         parsed.id = parts[parts.length - 1];
@@ -169,19 +120,15 @@ export async function fetchCollectionFromCloud(collectionName, customConfig = nu
       return parsed;
     });
   } catch (err) {
-    console.warn(`[CloudService] Fetch failed for ${collectionName}:`, err);
+    console.warn(`[Firebase] Network fetch error for ${collectionName}:`, err);
     return null;
   }
 }
 
-// Save / Update a single document in Firestore
-export async function saveDocToCloud(collectionName, docId, data, customConfig = null) {
-  const cfg = customConfig || getCloudConfig();
-  if (!cfg.projectId || !cfg.enabled) return false;
-
-  const projectId = cfg.projectId.trim();
+// 2. Save or Update a Document in Firestore (Direct Live Write)
+export async function saveDocToCloud(collectionName, docId, data) {
   const cleanId = encodeURIComponent(String(docId || data.id));
-  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionName}/${cleanId}`;
+  const url = getFirestoreUrl(`${collectionName}/${cleanId}`);
 
   const payload = {
     fields: toFirestoreFields(data)
@@ -193,50 +140,39 @@ export async function saveDocToCloud(collectionName, docId, data, customConfig =
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    return res.ok;
+    if (!res.ok) {
+      const errText = await res.text();
+      console.warn(`[Firebase] Write failed for ${collectionName}/${cleanId}:`, errText);
+      return false;
+    }
+    return true;
   } catch (err) {
-    console.error(`[CloudService] Save error for ${collectionName}/${docId}:`, err);
+    console.error(`[Firebase] Write exception for ${collectionName}/${cleanId}:`, err);
     return false;
   }
 }
 
-// Delete a document from Firestore
-export async function deleteDocFromCloud(collectionName, docId, customConfig = null) {
-  const cfg = customConfig || getCloudConfig();
-  if (!cfg.projectId || !cfg.enabled) return false;
-
-  const projectId = cfg.projectId.trim();
+// 3. Delete a Document from Firestore (Direct Live Delete)
+export async function deleteDocFromCloud(collectionName, docId) {
   const cleanId = encodeURIComponent(String(docId));
-  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionName}/${cleanId}`;
+  const url = getFirestoreUrl(`${collectionName}/${cleanId}`);
 
   try {
     const res = await fetch(url, { method: 'DELETE' });
     return res.ok;
   } catch (err) {
-    console.error(`[CloudService] Delete error for ${collectionName}/${docId}:`, err);
+    console.error(`[Firebase] Delete exception for ${collectionName}/${cleanId}:`, err);
     return false;
   }
 }
 
-// Sync all local items to Cloud (Batch sync)
-export async function syncAllToCloud(type, items, customConfig = null) {
-  const cfg = customConfig || getCloudConfig();
-  if (!cfg.projectId) return { success: false, message: 'Firebase Project ID is required.' };
-
+// 4. Batch Auto-Seed / Sync
+export async function syncAllToCloud(collectionName, items) {
   let successCount = 0;
-  let failCount = 0;
-
   for (const item of items) {
-    const id = item.id || `${type}-${Date.now()}`;
-    const ok = await saveDocToCloud(type, id, item, { ...cfg, enabled: true });
+    const id = item.id || `${collectionName}-${Date.now()}`;
+    const ok = await saveDocToCloud(collectionName, id, item);
     if (ok) successCount++;
-    else failCount++;
   }
-
-  return {
-    success: successCount > 0,
-    successCount,
-    failCount,
-    message: `Synced ${successCount} ${type} to Firebase Cloud.`
-  };
+  return { success: true, count: successCount };
 }
