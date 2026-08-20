@@ -578,6 +578,7 @@ export default function AdminPanel() {
                   onChange={(e) => setSelectedCat(e.target.value)}
                   style={{ padding: '12px 20px', borderRadius: '100px', border: '1.5px solid #CBD5E1', fontSize: '14px', fontWeight: 700, outline: 'none', backgroundColor: '#FFFFFF' }}
                 >
+                  <option value="All">All Categories</option>
                   {PRODUCT_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
               </div>
@@ -999,7 +1000,7 @@ export default function AdminPanel() {
                     onChange={(e) => setProdForm({ ...prodForm, category: e.target.value })}
                     style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', backgroundColor: '#FFFFFF', boxSizing: 'border-box' }}
                   >
-                    {PRODUCT_CATEGORIES.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
+                    {PRODUCT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
               </div>

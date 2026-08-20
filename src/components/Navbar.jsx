@@ -7,33 +7,77 @@ import logoImg from '../assets/logo.png';
 
 const CATEGORIES_MENU = [
   {
-    id: 'category-indian-spices',
-    categoryKey: 'Indian Spices',
+    id: 'category-ground-spices',
+    categoryKey: 'Ground Spices',
     number: '01',
-    title: 'Indian Spices',
-    subtitle: 'Pure Ground, Whole, Seed & Blended Spices',
+    title: 'Ground Spices',
+    subtitle: 'Turmeric, Chilli, Coriander & Cumin Powders',
     icon: Flame,
     color: '#D97706',
     bg: '#FEF3C7',
-    badge: '38+ Products'
+    badge: 'Powders'
+  },
+  {
+    id: 'category-whole-spices',
+    categoryKey: 'Whole Spices',
+    number: '02',
+    title: 'Whole Spices',
+    subtitle: 'Black Pepper, Dry Chillies, Cloves, Cardamom',
+    icon: Flame,
+    color: '#EA580C',
+    bg: '#FFEDD5',
+    badge: 'Whole Pods'
+  },
+  {
+    id: 'category-seed-spices',
+    categoryKey: 'Seed Spices',
+    number: '03',
+    title: 'Seed Spices',
+    subtitle: 'Cumin Seeds (Jeera), Coriander & Fennel Seeds',
+    icon: Wheat,
+    color: '#059669',
+    bg: '#D1FAE5',
+    badge: '99.5% Sortex'
+  },
+  {
+    id: 'category-blended-spices',
+    categoryKey: 'Blended Spices',
+    number: '04',
+    title: 'Blended Spices',
+    subtitle: 'Garam Masala, Biryani, Chaat & Curry Powders',
+    icon: Sparkles,
+    color: '#B45309',
+    bg: '#FEF3C7',
+    badge: 'Masalas'
+  },
+  {
+    id: 'category-exotic-spices',
+    categoryKey: 'Exotic & Premium Spices',
+    number: '05',
+    title: 'Exotic & Premium Spices',
+    subtitle: 'Kashmiri Mongra Saffron & Gourmet Vanilla',
+    icon: Sparkles,
+    color: '#E11D48',
+    bg: '#FFE4E6',
+    badge: 'Luxury Grade'
   },
   {
     id: 'category-agro-commodities',
     categoryKey: 'Agro Commodities',
-    number: '02',
+    number: '06',
     title: 'Agro Commodities',
-    subtitle: 'Basmati Rice, Wheat, Soybeans, Pulses & Seeds',
+    subtitle: '1121 Basmati Rice, Wheat, Soybeans & Peanuts',
     icon: Wheat,
-    color: '#059669',
-    bg: '#D1FAE5',
-    badge: 'Export Grade'
+    color: '#0D9488',
+    bg: '#CCFBF1',
+    badge: 'Export Grains'
   },
   {
     id: 'category-machinery',
     categoryKey: 'Machinery',
-    number: '03',
+    number: '07',
     title: 'Machinery',
-    subtitle: 'Sortex Sorters, Pulverizers & Packaging Units',
+    subtitle: 'Color Sorters, Spice Pulverizers & Packaging Units',
     icon: Cog,
     color: '#2563EB',
     bg: '#DBEAFE',
@@ -42,7 +86,7 @@ const CATEGORIES_MENU = [
   {
     id: 'category-pipes',
     categoryKey: 'Pipes',
-    number: '04',
+    number: '08',
     title: 'Pipes',
     subtitle: 'Stainless Steel, Carbon Steel, HDPE & PVC Pipes',
     icon: Cylinder,
@@ -213,7 +257,7 @@ export default function Navbar({ activePage, onNavigate }) {
                       <Sparkles size={13} /> Export Product Verticals
                     </span>
                     <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748B', backgroundColor: '#F1F5F9', padding: '2px 8px', borderRadius: '100px' }}>
-                      4 Categories
+                      8 Categories
                     </span>
                   </div>
 

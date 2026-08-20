@@ -5,7 +5,7 @@ import { PRODUCT_CATEGORIES } from '../data/products';
 import { useStoreProducts } from '../utils/useStore';
 
 export default function Products() {
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [activeCategory, setActiveCategory] = useState('Ground Spices');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
 
@@ -15,8 +15,7 @@ export default function Products() {
     if (!item) return false;
     const cat = String(item.category || item.cat || '');
     const subcat = String(item.subcategory || '');
-    const matchesCategory = activeCategory === 'All' || 
-      cat.toLowerCase() === activeCategory.toLowerCase() || 
+    const matchesCategory = cat.toLowerCase() === activeCategory.toLowerCase() || 
       subcat.toLowerCase() === activeCategory.toLowerCase();
     const q = searchTerm.toLowerCase();
     const matchesSearch = q === '' ||

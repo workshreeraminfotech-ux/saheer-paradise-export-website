@@ -20,7 +20,7 @@ import ContactPage from './pages/ContactPage';
 export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [activePage, setActivePage] = useState('home');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedCategory, setSelectedCategory] = useState('Ground Spices');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quoteProduct, setQuoteProduct] = useState('');
   const [isQuoteOpen, setIsQuoteOpen] = useState(false);
@@ -62,21 +62,25 @@ export default function App() {
   }
 
   const handleNavigate = (pageId, category = null) => {
-    if (pageId === 'category-indian-spices') {
+    if (category) {
       setActivePage('products');
-      setSelectedCategory('Indian Spices');
-    } else if (pageId === 'category-agro-commodities') {
+      setSelectedCategory(category);
+    } else if (pageId.startsWith('category-')) {
       setActivePage('products');
-      setSelectedCategory('Agro Commodities');
-    } else if (pageId === 'category-machinery') {
-      setActivePage('products');
-      setSelectedCategory('Machinery');
-    } else if (pageId === 'category-pipes') {
-      setActivePage('products');
-      setSelectedCategory('Pipes');
+      const catMap = {
+        'category-ground-spices': 'Ground Spices',
+        'category-whole-spices': 'Whole Spices',
+        'category-seed-spices': 'Seed Spices',
+        'category-blended-spices': 'Blended Spices',
+        'category-exotic-spices': 'Exotic & Premium Spices',
+        'category-agro-commodities': 'Agro Commodities',
+        'category-machinery': 'Machinery',
+        'category-pipes': 'Pipes'
+      };
+      setSelectedCategory(catMap[pageId] || 'Ground Spices');
     } else if (pageId === 'products') {
       setActivePage('products');
-      setSelectedCategory(category || 'All');
+      setSelectedCategory(category || 'Ground Spices');
     } else {
       setActivePage(pageId);
     }
