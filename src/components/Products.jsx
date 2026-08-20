@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { Search, Eye } from 'lucide-react';
 import ProductModal from './ProductModal';
 import { PRODUCT_CATEGORIES } from '../data/products';
-import { getProducts } from '../utils/adminStore';
+import { useStoreProducts } from '../utils/useStore';
 
 export default function Products() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  const productsList = getProducts();
+  const productsList = useStoreProducts();
 
   const filteredProducts = productsList.filter(item => {
     if (!item) return false;

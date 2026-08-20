@@ -423,9 +423,11 @@ export default function ProductsPage({ initialCategory = 'All', onSelectProduct,
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '26px',
-          padding: '0 4px'
+          padding: '0 4px',
+          flexWrap: 'wrap',
+          gap: '12px'
         }}>
-          <p style={{ fontSize: '14.5px', color: 'var(--gray)', fontWeight: 600 }}>
+          <p style={{ fontSize: '14.5px', color: 'var(--gray)', fontWeight: 600, margin: 0 }}>
             Showing <strong style={{ color: 'var(--navy)' }}>{filteredProducts.length}</strong> products
             {activeTab !== 'All' && <span> in <strong style={{ color: 'var(--gold-deep)' }}>{activeTab}</strong></span>}
             {activeSubcategory !== 'All' && <span> (Filtered by <em>{activeSubcategory}</em>)</span>}
@@ -449,166 +451,420 @@ export default function ProductsPage({ initialCategory = 'All', onSelectProduct,
           )}
         </div>
 
-        {/* Product Cards Grid */}
-        <motion.div
-          layout
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-            gap: '28px'
-          }}
-        >
-          <AnimatePresence>
-            {filteredProducts.map((product, idx) => (
-              <motion.div
-                key={product.id || idx}
-                layout
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.35, delay: (idx % 6) * 0.04 }}
-                style={{
+        {/* --- VIEW 1: CATEGORY-WISE GROUPED VIEW (When on 'All' Tab without search) --- */}
+        {activeTab === 'All' && !searchTerm.trim() ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '56px' }}>
+            {PRODUCT_CATEGORIES.filter(c => c !== 'All').map((catName) => {
+              const catItems = (productsList || []).filter(p => {
+                if (!p) return false;
+                const cat = String(p.category || p.cat || '');
+                return cat.toLowerCase() === catName.toLowerCase();
+              });
+
+              if (catItems.length === 0) return null;
+
+              const meta = CATEGORY_META[catName] || {};
+              const CatIcon = meta.icon || LayoutGrid;
+
+              return (
+                <div key={catName} style={{
                   backgroundColor: '#FFFFFF',
-                  borderRadius: '22px',
-                  overflow: 'hidden',
+                  borderRadius: '28px',
+                  padding: '36px 28px',
                   border: '1.5px solid var(--border)',
-                  boxShadow: '0 8px 30px rgba(10, 34, 64, 0.05)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  transition: 'transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease',
-                  cursor: 'pointer'
-                }}
-                whileHover={{ y: -6, boxShadow: '0 18px 40px rgba(200, 148, 10, 0.18)', borderColor: 'var(--gold)' }}
-                onClick={() => onSelectProduct ? onSelectProduct(product) : null}
-              >
-                {/* Product Image — Object-Fit Contain (Uncropped) */}
-                <div style={{
-                  position: 'relative',
-                  height: '240px',
-                  backgroundColor: '#FFFFFF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '20px',
-                  borderBottom: '1px solid var(--border)'
+                  boxShadow: '0 10px 36px rgba(10, 34, 64, 0.04)'
                 }}>
-                  <img
-                    src={product.image}
-                    alt={product.title}
-                    loading="lazy"
-                    style={{
-                      maxWidth: '100%',
-                      maxHeight: '100%',
-                      objectFit: 'contain',
-                      transition: 'transform 0.4s ease'
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.06)'}
-                    onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                  />
-
-                  {/* Category & Subcategory Badges */}
-                  <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
-                    <span style={{
-                      backgroundColor: 'var(--navy)',
-                      color: '#FFFFFF',
-                      fontSize: '11px',
-                      fontWeight: 800,
-                      padding: '3px 10px',
-                      borderRadius: '100px'
-                    }}>
-                      {product.category || product.cat}
-                    </span>
-                    {product.subcategory && (
-                      <span style={{
-                        backgroundColor: 'var(--gold-pale)',
-                        color: 'var(--gold-deep)',
-                        fontSize: '10.5px',
-                        fontWeight: 800,
-                        padding: '2px 8px',
-                        borderRadius: '100px',
-                        border: '1px solid var(--gold-light)'
+                  {/* Category Section Header */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '28px',
+                    paddingBottom: '18px',
+                    borderBottom: '2px solid #F1F5F9',
+                    flexWrap: 'wrap',
+                    gap: '16px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div style={{
+                        width: '46px',
+                        height: '46px',
+                        borderRadius: '14px',
+                        background: 'linear-gradient(135deg, #002147 0%, #0A3A6B 100%)',
+                        color: '#FFFFFF',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 12px rgba(0, 33, 71, 0.2)'
                       }}>
-                        {product.subcategory}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                        <CatIcon size={22} style={{ color: meta.color || '#38BDF8' }} />
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <h2 style={{
+                            fontFamily: 'var(--font-h, Outfit, sans-serif)',
+                            fontSize: '24px',
+                            fontWeight: 900,
+                            color: 'var(--navy)',
+                            margin: 0
+                          }}>
+                            {catName}
+                          </h2>
+                          <span style={{
+                            backgroundColor: 'var(--gold-pale)',
+                            color: 'var(--gold-deep)',
+                            fontSize: '12px',
+                            padding: '3px 10px',
+                            borderRadius: '100px',
+                            fontWeight: 800,
+                            border: '1px solid var(--gold-light)'
+                          }}>
+                            {catItems.length} Products
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 500 }}>
+                          {meta.desc ? meta.desc.slice(0, 95) + '...' : `Certified export quality ${catName}`}
+                        </span>
+                      </div>
+                    </div>
 
-                {/* Body Content */}
-                <div style={{
-                  padding: '22px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  flex: 1
-                }}>
-                  <h3 style={{
-                    fontFamily: 'var(--font-h, Outfit, sans-serif)',
-                    fontSize: '18.5px',
-                    fontWeight: 800,
-                    color: 'var(--navy)',
-                    marginBottom: '8px',
-                    lineHeight: 1.3
-                  }}>
-                    {product.title}
-                  </h3>
-
-                  {product.origin && (
-                    <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, marginBottom: '10px', display: 'block' }}>
-                      📍 {product.origin}
-                    </span>
-                  )}
-
-                  <p style={{
-                    fontSize: '13.5px',
-                    color: 'var(--gray)',
-                    lineHeight: 1.6,
-                    marginBottom: '20px',
-                    flex: 1,
-                    fontWeight: 500
-                  }}>
-                    {product.description || product.desc}
-                  </p>
-
-                  {/* Action Buttons */}
-                  <div style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onOpenQuote) onOpenQuote(product.title);
-                      }}
-                      className="btn btn-primary"
+                      onClick={() => handleTabChange(catName)}
                       style={{
-                        flex: 1,
-                        padding: '11px 16px',
+                        padding: '10px 20px',
+                        borderRadius: '100px',
                         fontSize: '13.5px',
-                        justifyContent: 'center'
+                        fontWeight: 800,
+                        backgroundColor: '#F8FAFC',
+                        color: 'var(--navy)',
+                        border: '1.5px solid var(--border)',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--navy)';
+                        e.currentTarget.style.color = '#FFFFFF';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.backgroundColor = '#F8FAFC';
+                        e.currentTarget.style.color = 'var(--navy)';
                       }}
                     >
-                      <span>Request Quote</span>
+                      <span>Explore All {catName}</span>
                       <ArrowRight size={14} />
                     </button>
-                    
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onSelectProduct) onSelectProduct(product);
-                      }}
-                      className="btn btn-outline"
-                      style={{
-                        padding: '11px 16px',
-                        fontSize: '13.5px',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      <Eye size={14} />
-                      <span>Details</span>
-                    </button>
+                  </div>
+
+                  {/* Category Products Grid */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: '24px'
+                  }}>
+                    {catItems.map((product, idx) => (
+                      <motion.div
+                        key={product.id || idx}
+                        initial={{ opacity: 0, y: 15 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.3, delay: (idx % 4) * 0.05 }}
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '20px',
+                          overflow: 'hidden',
+                          border: '1.5px solid var(--border)',
+                          boxShadow: '0 4px 20px rgba(10, 34, 64, 0.04)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          cursor: 'pointer',
+                          transition: 'transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease'
+                        }}
+                        whileHover={{ y: -6, boxShadow: '0 18px 40px rgba(200, 148, 10, 0.18)', borderColor: 'var(--gold)' }}
+                        onClick={() => onSelectProduct ? onSelectProduct(product) : null}
+                      >
+                        {/* Image */}
+                        <div style={{
+                          position: 'relative',
+                          height: '210px',
+                          backgroundColor: '#FFFFFF',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '16px',
+                          borderBottom: '1px solid var(--border)'
+                        }}>
+                          <img
+                            src={product.image}
+                            alt={product.title}
+                            loading="lazy"
+                            style={{
+                              maxWidth: '100%',
+                              maxHeight: '100%',
+                              objectFit: 'contain',
+                              transition: 'transform 0.4s ease'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.06)'}
+                            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                          />
+
+                          {product.subcategory && (
+                            <span style={{
+                              position: 'absolute',
+                              top: '10px',
+                              right: '10px',
+                              backgroundColor: 'var(--gold-pale)',
+                              color: 'var(--gold-deep)',
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              padding: '2px 8px',
+                              borderRadius: '100px',
+                              border: '1px solid var(--gold-light)'
+                            }}>
+                              {product.subcategory}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Body */}
+                        <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                          <h3 style={{
+                            fontFamily: 'var(--font-h, Outfit, sans-serif)',
+                            fontSize: '17px',
+                            fontWeight: 800,
+                            color: 'var(--navy)',
+                            marginBottom: '6px',
+                            lineHeight: 1.3
+                          }}>
+                            {product.title}
+                          </h3>
+
+                          {product.origin && (
+                            <span style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 600, marginBottom: '8px', display: 'block' }}>
+                              📍 {product.origin}
+                            </span>
+                          )}
+
+                          <p style={{
+                            fontSize: '13px',
+                            color: 'var(--gray)',
+                            lineHeight: 1.55,
+                            marginBottom: '16px',
+                            flex: 1,
+                            fontWeight: 500,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden'
+                          }}>
+                            {product.description || product.desc}
+                          </p>
+
+                          <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onOpenQuote) onOpenQuote(product.title);
+                              }}
+                              className="btn btn-primary"
+                              style={{
+                                flex: 1,
+                                padding: '9px 12px',
+                                fontSize: '12.5px',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              <span>Quote</span>
+                              <ArrowRight size={13} />
+                            </button>
+                            
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onSelectProduct) onSelectProduct(product);
+                              }}
+                              className="btn btn-outline"
+                              style={{
+                                padding: '9px 12px',
+                                fontSize: '12.5px',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              <Eye size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
                   </div>
                 </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </motion.div>
+              );
+            })}
+          </div>
+        ) : (
+          /* --- VIEW 2: SINGLE CATEGORY / SEARCH FILTERED GRID --- */
+          <motion.div
+            layout
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+              gap: '28px'
+            }}
+          >
+            <AnimatePresence>
+              {filteredProducts.map((product, idx) => (
+                <motion.div
+                  key={product.id || idx}
+                  layout
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.35, delay: (idx % 6) * 0.04 }}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '22px',
+                    overflow: 'hidden',
+                    border: '1.5px solid var(--border)',
+                    boxShadow: '0 8px 30px rgba(10, 34, 64, 0.05)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    transition: 'transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease',
+                    cursor: 'pointer'
+                  }}
+                  whileHover={{ y: -6, boxShadow: '0 18px 40px rgba(200, 148, 10, 0.18)', borderColor: 'var(--gold)' }}
+                  onClick={() => onSelectProduct ? onSelectProduct(product) : null}
+                >
+                  {/* Product Image — Object-Fit Contain (Uncropped) */}
+                  <div style={{
+                    position: 'relative',
+                    height: '240px',
+                    backgroundColor: '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px',
+                    borderBottom: '1px solid var(--border)'
+                  }}>
+                    <img
+                      src={product.image}
+                      alt={product.title}
+                      loading="lazy"
+                      style={{
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        objectFit: 'contain',
+                        transition: 'transform 0.4s ease'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.06)'}
+                      onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                    />
+
+                    {/* Category & Subcategory Badges */}
+                    <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
+                      <span style={{
+                        backgroundColor: 'var(--navy)',
+                        color: '#FFFFFF',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        padding: '3px 10px',
+                        borderRadius: '100px'
+                      }}>
+                        {product.category || product.cat}
+                      </span>
+                      {product.subcategory && (
+                        <span style={{
+                          backgroundColor: 'var(--gold-pale)',
+                          color: 'var(--gold-deep)',
+                          fontSize: '10.5px',
+                          fontWeight: 800,
+                          padding: '2px 8px',
+                          borderRadius: '100px',
+                          border: '1px solid var(--gold-light)'
+                        }}>
+                          {product.subcategory}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Body Content */}
+                  <div style={{
+                    padding: '22px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    flex: 1
+                  }}>
+                    <h3 style={{
+                      fontFamily: 'var(--font-h, Outfit, sans-serif)',
+                      fontSize: '18.5px',
+                      fontWeight: 800,
+                      color: 'var(--navy)',
+                      marginBottom: '8px',
+                      lineHeight: 1.3
+                    }}>
+                      {product.title}
+                    </h3>
+
+                    {product.origin && (
+                      <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, marginBottom: '10px', display: 'block' }}>
+                        📍 {product.origin}
+                      </span>
+                    )}
+
+                    <p style={{
+                      fontSize: '13.5px',
+                      color: 'var(--gray)',
+                      lineHeight: 1.6,
+                      marginBottom: '20px',
+                      flex: 1,
+                      fontWeight: 500
+                    }}>
+                      {product.description || product.desc}
+                    </p>
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onOpenQuote) onOpenQuote(product.title);
+                        }}
+                        className="btn btn-primary"
+                        style={{
+                          flex: 1,
+                          padding: '11px 16px',
+                          fontSize: '13.5px',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <span>Request Quote</span>
+                        <ArrowRight size={14} />
+                      </button>
+                      
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onSelectProduct) onSelectProduct(product);
+                        }}
+                        className="btn btn-outline"
+                        style={{
+                          padding: '11px 16px',
+                          fontSize: '13.5px',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <Eye size={14} />
+                        <span>Details</span>
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        )}
 
         {/* Empty State */}
         {filteredProducts.length === 0 && (
