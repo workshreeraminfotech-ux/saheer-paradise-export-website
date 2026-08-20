@@ -11,14 +11,21 @@ import {
   getProducts, addProduct, updateProduct, deleteProduct,
   getBlogs, addBlog, updateBlog, deleteBlog,
   getCertificates, addCertificate, updateCertificate, deleteCertificate,
-  getEnquiries, updateEnquiryStatus, deleteEnquiry, exportEnquiriesCSV
+  getEnquiries, updateEnquiryStatus, deleteEnquiry, exportEnquiriesCSV,
+  getCloudConfig, saveCloudConfig, testCloudConnection, syncAllToCloud
 } from '../utils/adminStore';
 import { PRODUCT_CATEGORIES } from '../data/products';
 
 export default function AdminPanel() {
   const [authenticated, setAuthenticated] = useState(isAdminLoggedIn());
-  const [activeTab, setActiveTab] = useState('products'); // 'products' | 'product_enquiries' | 'contact_enquiries' | 'blogs' | 'certs'
+  const [activeTab, setActiveTab] = useState('products'); // 'products' | 'product_enquiries' | 'contact_enquiries' | 'blogs' | 'certs' | 'cloud_sync'
   const [toast, setToast] = useState('');
+
+  // Cloud Database Sync State
+  const [cloudConfig, setCloudConfig] = useState(getCloudConfig());
+  const [isTestingCloud, setIsTestingCloud] = useState(false);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [cloudTestResult, setCloudTestResult] = useState(null);
 
   // Stores
   const [products, setProductsState] = useState(getProducts());
@@ -97,6 +104,40 @@ export default function AdminPanel() {
   const handleLogout = () => {
     logoutAdmin();
     setAuthenticated(false);
+  };
+
+  // --- CLOUD SYNC ACTIONS ---
+  const handleTestCloud = async () => {
+    setIsTestingCloud(true);
+    setCloudTestResult(null);
+    const res = await testCloudConnection(cloudConfig);
+    setIsTestingCloud(false);
+    setCloudTestResult(res);
+  };
+
+  const handleSaveCloudSettings = (e) => {
+    if (e) e.preventDefault();
+    saveCloudConfig(cloudConfig);
+    showNotification('Firebase Cloud settings saved & active!');
+  };
+
+  const handleUploadAllToCloud = async () => {
+    if (!cloudConfig.projectId || !cloudConfig.projectId.trim()) {
+      alert('Please enter your Firebase Project ID first.');
+      return;
+    }
+    setIsSyncingCloud(true);
+    try {
+      saveCloudConfig({ ...cloudConfig, enabled: true });
+      const prodRes = await syncAllToCloud('products', products, cloudConfig);
+      const blogRes = await syncAllToCloud('blogs', blogs, cloudConfig);
+      const certRes = await syncAllToCloud('certificates', certs, cloudConfig);
+      showNotification(`🚀 Success! Uploaded ${products.length} Products & ${blogs.length} Blogs to Firebase Cloud!`);
+    } catch (err) {
+      showNotification('Error during Cloud Sync. Check Firestore database rules.');
+    } finally {
+      setIsSyncingCloud(false);
+    }
   };
 
   if (!authenticated) {
@@ -549,6 +590,27 @@ export default function AdminPanel() {
                 <span>Manage Certificates ({certs.length})</span>
               </button>
 
+              <button
+                onClick={() => setActiveTab('cloud_sync')}
+                style={{
+                  padding: '12px 22px',
+                  borderRadius: '100px',
+                  backgroundColor: activeTab === 'cloud_sync' ? '#0284C7' : '#F0F9FF',
+                  color: activeTab === 'cloud_sync' ? '#FFFFFF' : '#0284C7',
+                  border: activeTab === 'cloud_sync' ? 'none' : '1.5px solid #38BDF8',
+                  fontWeight: 800,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginLeft: 'auto'
+                }}
+              >
+                <Globe size={17} />
+                <span>☁️ Cloud Database Sync {cloudConfig.enabled ? '🟢' : '🟡'}</span>
+              </button>
+
             </div>
           );
         })()}
@@ -958,6 +1020,249 @@ export default function AdminPanel() {
             </div>
           );
         })()}
+
+        {/* TAB 6: CLOUD DATABASE SYNC (FIREBASE REALTIME WORLDWIDE) */}
+        {activeTab === 'cloud_sync' && (
+          <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+            {/* Header Banner */}
+            <div style={{ backgroundColor: '#002147', borderRadius: '24px', padding: '32px', color: '#FFFFFF', marginBottom: '28px', boxShadow: '0 12px 36px rgba(0,33,71,0.15)', border: '1.5px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '20px', flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', padding: '6px 14px', borderRadius: '100px', fontSize: '12.5px', fontWeight: 800, marginBottom: '12px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+                    <Globe size={15} />
+                    <span>PERMANENT WORLDWIDE LIVE SYNC</span>
+                  </div>
+                  <h2 style={{ fontSize: '26px', fontWeight: 900, margin: '0 0 10px 0', fontFamily: 'var(--font-h, Outfit, sans-serif)' }}>
+                    Google Firebase Cloud Database
+                  </h2>
+                  <p style={{ color: '#94A3B8', fontSize: '15px', lineHeight: '1.6', margin: 0, maxWidth: '650px' }}>
+                    Aapke Admin Panel me kiye gaye saare changes (Products, Prices, Blogs, Certifications) ko <strong>Google Cloud</strong> me permanently save karne ke liye Firebase connect karein. Iske baad dunia bhar ke sabhi visitors ko turant live updated website dikhegi!
+                  </p>
+                </div>
+
+                <div style={{
+                  backgroundColor: cloudConfig.enabled ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.15)',
+                  border: cloudConfig.enabled ? '1.5px solid #22C55E' : '1.5px solid #EAB308',
+                  padding: '16px 20px',
+                  borderRadius: '16px',
+                  textAlign: 'center',
+                  minWidth: '180px'
+                }}>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: cloudConfig.enabled ? '#86EFAC' : '#FDE047', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                    Current Status
+                  </span>
+                  <strong style={{ fontSize: '16px', color: cloudConfig.enabled ? '#22C55E' : '#EAB308', display: 'block' }}>
+                    {cloudConfig.enabled ? '🟢 Cloud Active' : '🟡 Offline Local'}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Cloud Config Card */}
+            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '32px', border: '1.5px solid #CBD5E1', boxShadow: '0 8px 24px rgba(0,33,71,0.04)', marginBottom: '28px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#002147', margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <ShieldCheck size={22} style={{ color: '#0284C7' }} />
+                <span>Firebase Configuration Settings</span>
+              </h3>
+
+              <form onSubmit={handleSaveCloudSettings} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: '#002147', marginBottom: '8px' }}>
+                    Firebase Project ID *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. saheer-paradise-exports"
+                    value={cloudConfig.projectId || ''}
+                    onChange={(e) => setCloudConfig({ ...cloudConfig, projectId: e.target.value.trim() })}
+                    style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14.5px', boxSizing: 'border-box', outline: 'none', fontFamily: 'monospace' }}
+                  />
+                  <span style={{ fontSize: '12.5px', color: '#64748B', marginTop: '6px', display: 'block' }}>
+                    Google Firebase Console ke Project Settings me jo Project ID hota hai use yahan dalein.
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', backgroundColor: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0' }}>
+                  <input
+                    type="checkbox"
+                    id="cloudEnabled"
+                    checked={!!cloudConfig.enabled}
+                    onChange={(e) => setCloudConfig({ ...cloudConfig, enabled: e.target.checked })}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="cloudEnabled" style={{ fontSize: '14px', fontWeight: 700, color: '#002147', cursor: 'pointer' }}>
+                    Enable Worldwide Realtime Cloud Sync (Sabhi users ke liye permanent updates live karein)
+                  </label>
+                </div>
+
+                {cloudTestResult && (
+                  <div style={{
+                    padding: '14px 18px',
+                    borderRadius: '12px',
+                    fontSize: '13.5px',
+                    fontWeight: 600,
+                    backgroundColor: cloudTestResult.success ? '#F0FDF4' : '#FEF2F2',
+                    color: cloudTestResult.success ? '#15803D' : '#991B1B',
+                    border: cloudTestResult.success ? '1.5px solid #86EFAC' : '1.5px solid #FCA5A5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}>
+                    {cloudTestResult.success ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                    <span>{cloudTestResult.message}</span>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={handleTestCloud}
+                    disabled={isTestingCloud || !cloudConfig.projectId}
+                    style={{
+                      padding: '12px 24px',
+                      borderRadius: '100px',
+                      backgroundColor: '#F1F5F9',
+                      border: '1.5px solid #CBD5E1',
+                      color: '#002147',
+                      fontWeight: 700,
+                      fontSize: '14px',
+                      cursor: isTestingCloud || !cloudConfig.projectId ? 'not-allowed' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <RefreshCw size={16} className={isTestingCloud ? 'animate-spin' : ''} />
+                    <span>{isTestingCloud ? 'Testing Connection...' : '🧪 Test Firebase Connection'}</span>
+                  </button>
+
+                  <button
+                    type="submit"
+                    style={{
+                      padding: '12px 28px',
+                      borderRadius: '100px',
+                      backgroundColor: '#002147',
+                      border: 'none',
+                      color: '#FFFFFF',
+                      fontWeight: 800,
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <Check size={16} />
+                    <span>Save & Connect Cloud Database</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* One-Click Upload All Data to Cloud */}
+            <div style={{ backgroundColor: '#F0F9FF', borderRadius: '24px', padding: '32px', border: '1.5px solid #BAE6FD', boxShadow: '0 8px 24px rgba(2,132,199,0.06)', marginBottom: '28px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', flexWrap: 'wrap' }}>
+                <div>
+                  <h3 style={{ fontSize: '19px', fontWeight: 900, color: '#0369A1', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span>🚀 1-Click: Upload All Local Products & Data to Cloud</span>
+                  </h3>
+                  <p style={{ color: '#475569', fontSize: '14px', margin: 0, maxWidth: '550px' }}>
+                    Website me maujood saare <strong>{products.length} Products</strong>, <strong>{blogs.length} Blogs</strong> aur <strong>{certs.length} Certifications</strong> ko ek click me Google Firebase Cloud par upload karke live sync karein.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleUploadAllToCloud}
+                  disabled={isSyncingCloud || !cloudConfig.projectId}
+                  style={{
+                    padding: '14px 28px',
+                    borderRadius: '100px',
+                    backgroundColor: '#0284C7',
+                    border: 'none',
+                    color: '#FFFFFF',
+                    fontWeight: 800,
+                    fontSize: '14.5px',
+                    cursor: isSyncingCloud || !cloudConfig.projectId ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    boxShadow: '0 6px 20px rgba(2, 132, 199, 0.35)'
+                  }}
+                >
+                  <Upload size={18} className={isSyncingCloud ? 'animate-spin' : ''} />
+                  <span>{isSyncingCloud ? 'Uploading Data to Cloud...' : 'Upload All to Cloud Database'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 4-Step Simple Hindi Tutorial */}
+            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '32px', border: '1.5px solid #CBD5E1' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#002147', margin: '0 0 16px 0' }}>
+                📖 Free Google Firebase Setup Guide (2 Minutes Process):
+              </h3>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#002147', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '13px', flexShrink: 0 }}>
+                    1
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: '14.5px', color: '#002147', display: 'block' }}>
+                      Firebase Console Open karein
+                    </strong>
+                    <span style={{ fontSize: '13.5px', color: '#475569' }}>
+                      Apne Google account se <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" style={{ color: '#0284C7', fontWeight: 700 }}>console.firebase.google.com</a> par login karein aur <strong>"Add Project"</strong> par click karke project name dalein (e.g. <code>saheer-paradise-export</code>).
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#002147', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '13px', flexShrink: 0 }}>
+                    2
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: '14.5px', color: '#002147', display: 'block' }}>
+                      Firestore Database Create karein
+                    </strong>
+                    <span style={{ fontSize: '13.5px', color: '#475569' }}>
+                      Left menu me <strong>"Firestore Database"</strong> par click karein -&gt; <strong>"Create Database"</strong> karein -&gt; Location select karein aur <strong>"Start in Test Mode"</strong> select karke Create par click karein.
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#002147', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '13px', flexShrink: 0 }}>
+                    3
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: '14.5px', color: '#002147', display: 'block' }}>
+                      Project ID Copy karke Yahan Paste karein
+                    </strong>
+                    <span style={{ fontSize: '13.5px', color: '#475569' }}>
+                      Project Settings se apna <strong>Project ID</strong> copy karein aur upar input box me daal kar <strong>"Save & Connect"</strong> button dabayein.
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#15803D', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '13px', flexShrink: 0 }}>
+                    4
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: '14.5px', color: '#15803D', display: 'block' }}>
+                      "Upload All to Cloud" Dabayein - Done! 🎉
+                    </strong>
+                    <span style={{ fontSize: '13.5px', color: '#475569' }}>
+                      Ek baar upload dabate hi saara data Google Cloud me save ho jayega aur permanent sabhi users ko dikhega!
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
 

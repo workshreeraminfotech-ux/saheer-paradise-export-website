@@ -4,6 +4,17 @@
 import { PRODUCTS as INITIAL_PRODUCTS, PRODUCT_CATEGORIES } from '../data/products';
 import { BLOGS as INITIAL_BLOGS } from '../data/blogs';
 import { idbGet, idbSet } from './idbStorage';
+import { 
+  fetchCollectionFromCloud, 
+  saveDocToCloud, 
+  deleteDocFromCloud, 
+  getCloudConfig, 
+  saveCloudConfig, 
+  testCloudConnection, 
+  syncAllToCloud 
+} from '../services/cloudService';
+
+export { getCloudConfig, saveCloudConfig, testCloudConnection, syncAllToCloud };
 
 import apedaLogo from '../assets/certificate/apeda.png';
 import spicesBoardLogo from '../assets/certificate/spices board.png';
@@ -72,7 +83,7 @@ export function notifyStoreUpdate() {
   } catch (e) {}
 }
 
-// Initial Sync from IndexedDB & LocalStorage on startup
+// Initial Sync from IndexedDB & LocalStorage & Firebase Cloud on startup
 if (typeof window !== 'undefined') {
   // 1. Initial quick load from localStorage (if any)
   try {
@@ -117,9 +128,51 @@ if (typeof window !== 'undefined') {
       if (hasUpdate) {
         notifyStoreUpdate();
       }
+
+      // 3. Load latest global dataset from Firebase Cloud Firestore (Permanent worldwide sync)
+      const cfg = getCloudConfig();
+      if (cfg && cfg.projectId && cfg.enabled) {
+        try {
+          const [cloudProds, cloudBlogs, cloudCerts, cloudEnqs] = await Promise.all([
+            fetchCollectionFromCloud('products', cfg),
+            fetchCollectionFromCloud('blogs', cfg),
+            fetchCollectionFromCloud('certificates', cfg),
+            fetchCollectionFromCloud('enquiries', cfg)
+          ]);
+
+          let hasCloudUpdate = false;
+          if (cloudProds && Array.isArray(cloudProds) && cloudProds.length > 0) {
+            memoryProducts = cloudProds;
+            idbSet('marvex_products', cloudProds);
+            hasCloudUpdate = true;
+          }
+          if (cloudBlogs && Array.isArray(cloudBlogs) && cloudBlogs.length > 0) {
+            memoryBlogs = cloudBlogs;
+            idbSet('marvex_blogs', cloudBlogs);
+            hasCloudUpdate = true;
+          }
+          if (cloudCerts && Array.isArray(cloudCerts) && cloudCerts.length > 0) {
+            memoryCerts = cloudCerts;
+            idbSet('marvex_certs', cloudCerts);
+            hasCloudUpdate = true;
+          }
+          if (cloudEnqs && Array.isArray(cloudEnqs) && cloudEnqs.length > 0) {
+            memoryEnquiries = cloudEnqs;
+            idbSet('marvex_enquiries', cloudEnqs);
+            hasCloudUpdate = true;
+          }
+
+          if (hasCloudUpdate) {
+            notifyStoreUpdate();
+          }
+        } catch (cloudErr) {
+          console.warn('[Store] Cloud init sync skipped:', cloudErr);
+        }
+      }
     } catch (e) {}
   })();
 }
+
 
 // Global listener for realtime snapshot events
 if (typeof window !== 'undefined') {
@@ -222,6 +275,7 @@ export async function addProduct(newProd) {
   };
   const updated = [prodWithId, ...list];
   saveProducts(updated);
+  saveDocToCloud('products', prodWithId.id, prodWithId).catch(() => {});
   return updated;
 }
 
@@ -229,6 +283,7 @@ export async function updateProduct(updatedProd) {
   const list = getProducts();
   const updated = list.map(p => (p.id === updatedProd.id ? { ...p, ...updatedProd } : p));
   saveProducts(updated);
+  saveDocToCloud('products', updatedProd.id, updatedProd).catch(() => {});
   return updated;
 }
 
@@ -236,6 +291,7 @@ export async function deleteProduct(id) {
   const list = getProducts();
   const updated = list.filter(p => p.id !== id);
   saveProducts(updated);
+  deleteDocFromCloud('products', id).catch(() => {});
   return updated;
 }
 
@@ -274,11 +330,12 @@ export async function addBlog(newBlog) {
   const list = getBlogs();
   const blogWithId = {
     ...newBlog,
-    id: newBlog.id || Date.now(),
+    id: newBlog.id || `blog-${Date.now()}`,
     date: newBlog.date || new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
   };
   const updated = [blogWithId, ...list];
   saveBlogs(updated);
+  saveDocToCloud('blogs', blogWithId.id, blogWithId).catch(() => {});
   return updated;
 }
 
@@ -286,6 +343,7 @@ export async function updateBlog(updatedBlog) {
   const list = getBlogs();
   const updated = list.map(b => (b.id === updatedBlog.id ? { ...b, ...updatedBlog } : b));
   saveBlogs(updated);
+  saveDocToCloud('blogs', updatedBlog.id, updatedBlog).catch(() => {});
   return updated;
 }
 
@@ -293,6 +351,7 @@ export async function deleteBlog(id) {
   const list = getBlogs();
   const updated = list.filter(b => b.id !== id);
   saveBlogs(updated);
+  deleteDocFromCloud('blogs', id).catch(() => {});
   return updated;
 }
 
@@ -335,6 +394,7 @@ export async function addCertificate(newCert) {
   };
   const updated = [...list, certWithId];
   saveCertificates(updated);
+  saveDocToCloud('certificates', certWithId.id, certWithId).catch(() => {});
   return updated;
 }
 
@@ -342,6 +402,7 @@ export async function updateCertificate(updatedCert) {
   const list = getCertificates();
   const updated = list.map(c => (c.id === updatedCert.id ? { ...c, ...updatedCert } : c));
   saveCertificates(updated);
+  saveDocToCloud('certificates', updatedCert.id, updatedCert).catch(() => {});
   return updated;
 }
 
@@ -349,6 +410,7 @@ export async function deleteCertificate(id) {
   const list = getCertificates();
   const updated = list.filter(c => c.id !== id);
   saveCertificates(updated);
+  deleteDocFromCloud('certificates', id).catch(() => {});
   return updated;
 }
 
@@ -432,6 +494,7 @@ export async function addEnquiry(enquiryData) {
   };
   const updated = [newEnquiry, ...list];
   saveEnquiries(updated);
+  saveDocToCloud('enquiries', newEnquiry.id, newEnquiry).catch(() => {});
   return updated;
 }
 
@@ -439,6 +502,8 @@ export async function updateEnquiryStatus(id, status) {
   const list = getEnquiries();
   const updated = list.map(e => (e.id === id ? { ...e, status } : e));
   saveEnquiries(updated);
+  const found = updated.find(e => e.id === id);
+  if (found) saveDocToCloud('enquiries', id, found).catch(() => {});
   return updated;
 }
 
@@ -446,6 +511,7 @@ export async function deleteEnquiry(id) {
   const list = getEnquiries();
   const updated = list.filter(e => e.id !== id);
   saveEnquiries(updated);
+  deleteDocFromCloud('enquiries', id).catch(() => {});
   return updated;
 }
 

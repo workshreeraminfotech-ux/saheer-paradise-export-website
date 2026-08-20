@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://priyaimpexs.com/sitemap.xml
+Sitemap: https://saheerparadiseexport.com/sitemap.xml
+
