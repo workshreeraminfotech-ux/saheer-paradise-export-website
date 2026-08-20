@@ -15,6 +15,32 @@ import {
 } from '../utils/adminStore';
 import { PRODUCT_CATEGORIES } from '../data/products';
 
+export const CATEGORY_SUBCATEGORIES = {
+  'Indian Spices': [
+    'Ground Spices',
+    'Whole Spices',
+    'Seed Spices',
+    'Blended Spices',
+    'Exotic & Premium'
+  ],
+  'Agro Commodities': [
+    'Rice & Grains',
+    'Oilseeds & Meals',
+    'Pulses & Legumes'
+  ],
+  'Machinery': [
+    'Processing Machinery',
+    'Packaging Equipment',
+    'Agro Machinery'
+  ],
+  'Pipes': [
+    'Stainless Steel Pipes',
+    'Carbon Steel Pipes',
+    'Plastic & Polymer Pipes',
+    'Irrigation Pipes'
+  ]
+};
+
 export default function AdminPanel() {
   const [authenticated, setAuthenticated] = useState(isAdminLoggedIn());
   const [activeTab, setActiveTab] = useState('products'); // 'products' | 'product_enquiries' | 'contact_enquiries' | 'blogs' | 'certs'
@@ -44,7 +70,7 @@ export default function AdminPanel() {
 
   // Form States
   const [prodForm, setProdForm] = useState({
-    title: '', category: 'Indian Spices', origin: '', packaging: '', specs: '', description: '', image: '', hsCode: '', isFeatured: false
+    title: '', category: 'Indian Spices', subcategory: 'Ground Spices', origin: 'India', packaging: '25kg PP Bags / Custom', specs: '', description: '', image: '', hsCode: 'HS 0910', isFeatured: false
   });
 
   const [blogForm, setBlogForm] = useState({
@@ -52,26 +78,18 @@ export default function AdminPanel() {
   });
 
   const [certForm, setCertForm] = useState({
-    name: '', code: '', tag: '', logo: ''
+    name: '', code: 'CERTIFIED', tag: '', logo: ''
   });
 
-  // Sync state on load & listen for global updates
+  // Re-fetch data on activeTab change or mount
   useEffect(() => {
-    setProductsState(getProducts());
-    setBlogsState(getBlogs());
-    setCertsState(getCertificates());
-    setEnquiriesState(getEnquiries());
-
-    const handleStoreUpdate = () => {
+    if (authenticated) {
       setProductsState(getProducts());
       setBlogsState(getBlogs());
       setCertsState(getCertificates());
       setEnquiriesState(getEnquiries());
-    };
-
-    window.addEventListener('priya_store_updated', handleStoreUpdate);
-    return () => window.removeEventListener('priya_store_updated', handleStoreUpdate);
-  }, [authenticated]);
+    }
+  }, [authenticated, activeTab]);
 
   // --- ENQUIRY ACTIONS ---
   const handleToggleEnquiryStatus = async (id, currentStatus) => {
@@ -94,18 +112,27 @@ export default function AdminPanel() {
     setTimeout(() => setToast(''), 3500);
   };
 
+  const handleLoginSuccess = () => {
+    setAuthenticated(true);
+    setProductsState(getProducts());
+    setBlogsState(getBlogs());
+    setCertsState(getCertificates());
+    setEnquiriesState(getEnquiries());
+    showNotification('Welcome back, Admin!');
+  };
+
   const handleLogout = () => {
     logoutAdmin();
     setAuthenticated(false);
   };
 
   if (!authenticated) {
-    return <AdminLogin onLoginSuccess={() => setAuthenticated(true)} />;
+    return <AdminLogin onLoginSuccess={handleLoginSuccess} />;
   }
 
   // --- IMAGE FILE CONVERTER WITH AUTOMATIC ULTRA-COMPACT COMPRESSION ---
   const handleImageFileChange = (e, callback) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
@@ -113,19 +140,20 @@ export default function AdminPanel() {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_DIMENSION = 640; // Optimal for catalog grids & detail views
+        const MAX_WIDTH = 750;
+        const MAX_HEIGHT = 750;
         let width = img.width;
         let height = img.height;
 
         if (width > height) {
-          if (width > MAX_DIMENSION) {
-            height = Math.round((height * MAX_DIMENSION) / width);
-            width = MAX_DIMENSION;
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
           }
         } else {
-          if (height > MAX_DIMENSION) {
-            width = Math.round((width * MAX_DIMENSION) / height);
-            height = MAX_DIMENSION;
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
           }
         }
 
@@ -149,16 +177,28 @@ export default function AdminPanel() {
   const openAddProduct = () => {
     setEditingProduct(null);
     setProdForm({
-      title: '', category: 'Indian Spices', origin: 'India', packaging: '25kg PP Bags / Custom', specs: '', description: '', image: '', hsCode: 'HS 0910', isFeatured: false
+      title: '', 
+      category: 'Indian Spices', 
+      subcategory: 'Ground Spices', 
+      origin: 'India', 
+      packaging: '25kg PP Bags / Custom', 
+      specs: '', 
+      description: '', 
+      image: '', 
+      hsCode: 'HS 0910', 
+      isFeatured: false
     });
     setShowProductModal(true);
   };
 
   const openEditProduct = (prod) => {
     setEditingProduct(prod);
+    const cat = prod.category || prod.cat || 'Indian Spices';
+    const subOptions = CATEGORY_SUBCATEGORIES[cat] || [];
     setProdForm({
       title: prod.title || '',
-      category: prod.category || prod.cat || 'Indian Spices',
+      category: cat,
+      subcategory: prod.subcategory || subOptions[0] || 'Ground Spices',
       origin: prod.origin || '',
       packaging: prod.packaging || '',
       specs: prod.specs || '',
@@ -175,11 +215,22 @@ export default function AdminPanel() {
     if (!prodForm.title.trim()) return alert('Please enter product title');
 
     if (editingProduct) {
-      const updated = await updateProduct({ ...editingProduct, ...prodForm, cat: prodForm.category, desc: prodForm.description });
+      const updated = await updateProduct({ 
+        ...editingProduct, 
+        ...prodForm, 
+        cat: prodForm.category, 
+        desc: prodForm.description,
+        subcategory: prodForm.subcategory
+      });
       setProductsState(updated);
       showNotification(`Product "${prodForm.title}" saved & synced live!`);
     } else {
-      const updated = await addProduct({ ...prodForm, cat: prodForm.category, desc: prodForm.description });
+      const updated = await addProduct({ 
+        ...prodForm, 
+        cat: prodForm.category, 
+        desc: prodForm.description,
+        subcategory: prodForm.subcategory
+      });
       setProductsState(updated);
       showNotification(`New Product "${prodForm.title}" added & synced live!`);
     }
@@ -614,7 +665,24 @@ export default function AdminPanel() {
                           <span style={{ fontSize: '12px', color: '#475569' }}>{p.desc ? p.desc.substring(0, 50) + '...' : ''}</span>
                         </div>
                       </td>
-                      <td style={{ padding: '16px 20px', fontWeight: 600, color: '#002147' }}>{p.category || p.cat}</td>
+                      <td style={{ padding: '16px 20px', color: '#002147' }}>
+                        <span style={{ fontWeight: 800, display: 'block', fontSize: '13.5px' }}>{p.category || p.cat}</span>
+                        {p.subcategory && (
+                          <span style={{
+                            display: 'inline-block',
+                            backgroundColor: '#FEF3C7',
+                            color: '#B45309',
+                            fontSize: '11px',
+                            fontWeight: 800,
+                            padding: '2px 8px',
+                            borderRadius: '100px',
+                            marginTop: '4px',
+                            border: '1px solid #FDE68A'
+                          }}>
+                            {p.subcategory}
+                          </span>
+                        )}
+                      </td>
                       <td style={{ padding: '16px 20px', color: '#475569' }}>{p.origin}</td>
                       <td style={{ padding: '16px 20px', color: '#475569', fontWeight: 600 }}>{p.hsCode || '—'}</td>
                       <td style={{ padding: '16px 20px', textAlign: 'right' }}>
@@ -981,26 +1049,47 @@ export default function AdminPanel() {
             </div>
 
             <form onSubmit={handleSaveProduct} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Product Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Turmeric Powder"
+                  value={prodForm.title}
+                  onChange={(e) => setProdForm({ ...prodForm, title: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Product Title *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Turmeric Powder"
-                    value={prodForm.title}
-                    onChange={(e) => setProdForm({ ...prodForm, title: e.target.value })}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
-                  />
-                </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Category *</label>
                   <select
                     value={prodForm.category}
-                    onChange={(e) => setProdForm({ ...prodForm, category: e.target.value })}
+                    onChange={(e) => {
+                      const newCat = e.target.value;
+                      const subOptions = CATEGORY_SUBCATEGORIES[newCat] || [];
+                      setProdForm({ 
+                        ...prodForm, 
+                        category: newCat, 
+                        subcategory: subOptions[0] || 'General' 
+                      });
+                    }}
                     style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', backgroundColor: '#FFFFFF', boxSizing: 'border-box' }}
                   >
                     {PRODUCT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Sub-Category (e.g. Ground Spices) *</label>
+                  <select
+                    value={prodForm.subcategory}
+                    onChange={(e) => setProdForm({ ...prodForm, subcategory: e.target.value })}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', backgroundColor: '#FFFFFF', boxSizing: 'border-box' }}
+                  >
+                    {(CATEGORY_SUBCATEGORIES[prodForm.category] || ['General']).map(sc => (
+                      <option key={sc} value={sc}>{sc}</option>
+                    ))}
                   </select>
                 </div>
               </div>
