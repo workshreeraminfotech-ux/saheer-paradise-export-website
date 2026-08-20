@@ -8,104 +8,70 @@ import { PRODUCT_CATEGORIES } from '../data/products';
 import { useStoreProducts } from '../utils/useStore';
 
 const CATEGORY_META = {
-  'Ground Spices': {
-    title: 'Pure Ground Spices & Powders',
-    highlight: 'Ultra-Fine Milling & Cryogenic Grinding',
+  'Indian Spices': {
+    title: 'Pure Indian Spices & Spice Blends',
+    highlight: '1st Vertical: Indian Spices',
     eyebrow: 'APEDA & Spices Board of India Certified',
-    desc: 'Pure ground spices milled from handpicked raw roots and seeds. Double-sifted for rich natural color, maximum essential oil retention, and aroma.',
+    desc: 'Ultra-pure ground spices, whole bold spices, aromatic seed spices, and heritage culinary spice mixes double-sifted for maximum essential oil retention.',
     bgImg: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=1920&q=80',
     icon: Flame,
     color: '#F59E0B',
-    badges: ['High Curcumin & Oil', 'Zero Artificial Colors', 'Custom Vacuum Packing']
-  },
-  'Whole Spices': {
-    title: 'Natural Whole Spices & Bold Pods',
-    highlight: 'Sun-Cured & Machine Cleaned',
-    eyebrow: 'Direct Farm Harvest from Kerala & Andhra',
-    desc: 'Premium whole spices including bold black pepper, sun-dried red chillies, cinnamon quills, whole cloves, green cardamom, and mother turmeric roots.',
-    bgImg: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=1920&q=80',
-    icon: Flame,
-    color: '#EA580C',
-    badges: ['Grade-A Bold Pods', 'Sortex Machine Cleaned', 'Jute & Vacuum Packing']
-  },
-  'Seed Spices': {
-    title: 'Aromatic Whole Seed Spices',
-    highlight: '99.5% Purity Singapore / Europe Quality',
-    eyebrow: 'Sourced from Gujarat (Unjha) & Rajasthan',
-    desc: 'Sortex cleaned Cumin Seeds (Jeera), Coriander Seeds (Dhana), and Green Fennel Seeds (Saunf) with high natural volatile oil content.',
-    bgImg: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=1920&q=80',
-    icon: Wheat,
-    color: '#84CC16',
-    badges: ['99.5% Sortex Cleaned', 'High Volatile Oil', 'PP Woven Bags']
-  },
-  'Blended Spices': {
-    title: 'Heritage Indian Blended Seasonings & Masalas',
-    highlight: 'Authentic Traditional Formulations',
-    eyebrow: 'Chef-Grade Export Masala Blends',
-    desc: 'Masterfully balanced Garam Masala, Chaat Masala, Biryani Masala, Kitchen King, and Madras Curry Powder prepared from secret heritage recipes.',
-    bgImg: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=1920&q=80',
-    icon: Flame,
-    color: '#D97706',
-    badges: ['100% Pure Spices', 'No Added Preservatives', 'Private Label & Bulk']
-  },
-  'Exotic & Premium Spices': {
-    title: 'Exotic & Luxury Spices',
-    highlight: 'World-Prized Kashmiri Saffron & Vanilla',
-    eyebrow: 'Gourmet Grade-A Certified Origin',
-    desc: '100% pure Kashmiri Mongra Saffron stigmas and plump Gourmet Grade-A Vanilla Beans with intense floral sweetness and crocin purity.',
-    bgImg: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=1920&q=80',
-    icon: Sparkles,
-    color: '#E11D48',
-    badges: ['Mongra Grade-1 Red Stigmas', 'Vanillin > 2.0%', 'Air-Tight Tins & Packs']
+    badges: ['100% Pure Origin', 'High Curcumin & Oil Content', 'Custom Vacuum Packing'],
+    subcategories: ['All Spices', 'Ground Spices', 'Whole Spices', 'Seed Spices', 'Blended Spices', 'Exotic & Premium']
   },
   'Agro Commodities': {
     title: 'Indian Agro Commodities & Grains',
-    highlight: 'Direct Farm Procurement & Sortex Graded',
-    eyebrow: '1121 Basmati, MP Wheat, Soybeans, Peanuts & Pulses',
+    highlight: '2nd Vertical: Agro Commodities',
+    eyebrow: 'Direct Farm Procurement & Sortex Graded',
     desc: '1121 Extra Long Steam Basmati Rice, Sharbati MP Milling Wheat, Non-GMO Soybeans, Java & Bold Peanuts, Kabuli Chickpeas, and Oilseeds.',
     bgImg: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?auto=format&fit=crop&w=1920&q=80',
     icon: Wheat,
     color: '#10B981',
-    badges: ['Phytosanitary Certified', 'Moisture < 12%', 'Bulk Liner & PP Bags']
+    badges: ['Phytosanitary Certified', 'Moisture < 12%', 'Bulk Liner & PP Bags'],
+    subcategories: ['All Agro', 'Rice & Grains', 'Oilseeds & Meals', 'Pulses & Legumes']
   },
   'Machinery': {
     title: 'Industrial & Agricultural Machinery',
-    highlight: 'High-Efficiency Processing & Packaging Units',
-    eyebrow: 'CE & ISO Certified Food Grade Equipment',
+    highlight: '3rd Vertical: Machinery',
+    eyebrow: 'High-Efficiency Processing & Packaging Units',
     desc: 'AI Optical RGB Color Sorters, Commercial Cool-Grinding Spice Pulverizers, Multi-Head High Speed Pouch Packaging Machines, and Tractor Rotavators.',
     bgImg: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1920&q=80',
     icon: Cog,
     color: '#3B82F6',
-    badges: ['CE / ISO Certified', 'SS304 Food Grade', 'Seaworthy Wooden Crating']
+    badges: ['CE / ISO Certified', 'SS304 Food Grade', 'Seaworthy Wooden Crating'],
+    subcategories: ['All Machinery', 'Processing Machinery', 'Packaging Equipment', 'Agro Machinery']
   },
   'Pipes': {
     title: 'Industrial & Agricultural Pipes Catalog',
-    highlight: 'ASTM, ASME, IS & ISO Certified Pipeline Solutions',
-    eyebrow: 'Stainless Steel, Carbon Steel, HDPE & PVC Systems',
+    highlight: '4th Vertical: Industrial Pipes',
+    eyebrow: 'ASTM, ASME, IS & ISO Certified Pipeline Solutions',
     desc: 'Stainless Steel SS304/SS316L Seamless Pipes, API 5L Carbon Steel Line Pipes, Virgin HDPE PE100 Water Pipes, UPVC and Precision Drip Irrigation Systems.',
     bgImg: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1920&q=80',
     icon: Cylinder,
     color: '#6366F1',
-    badges: ['ASTM A312 / API 5L', 'Hydrostatic Tested', 'UV Stabilized Polymers']
+    badges: ['ASTM A312 / API 5L', 'Hydrostatic Tested', 'UV Stabilized Polymers'],
+    subcategories: ['All Pipes', 'Stainless Steel Pipes', 'Carbon Steel Pipes', 'Plastic & Polymer Pipes', 'Irrigation Pipes']
   }
 };
 
-export default function ProductsPage({ initialCategory = 'Ground Spices', onSelectProduct, onOpenQuote }) {
-  const defaultCategory = (initialCategory && initialCategory !== 'All' && CATEGORY_META[initialCategory]) ? initialCategory : 'Ground Spices';
+export default function ProductsPage({ initialCategory = 'Indian Spices', onSelectProduct, onOpenQuote }) {
+  const defaultCategory = (initialCategory && CATEGORY_META[initialCategory]) ? initialCategory : 'Indian Spices';
   const [activeTab, setActiveTab] = useState(defaultCategory);
+  const [activeSubcategory, setActiveSubcategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
 
   // Sync if initialCategory prop changes from navbar click
   useEffect(() => {
     if (initialCategory) {
-      const target = (initialCategory !== 'All' && CATEGORY_META[initialCategory]) ? initialCategory : 'Ground Spices';
+      const target = CATEGORY_META[initialCategory] ? initialCategory : 'Indian Spices';
       setActiveTab(target);
+      setActiveSubcategory('All');
     }
   }, [initialCategory]);
 
   const productsList = useStoreProducts();
 
-  const currentMeta = CATEGORY_META[activeTab] || CATEGORY_META['Ground Spices'];
+  const currentMeta = CATEGORY_META[activeTab] || CATEGORY_META['Indian Spices'];
   const HeaderIcon = currentMeta.icon || Flame;
 
   // Filter logic safely
@@ -125,13 +91,14 @@ export default function ProductsPage({ initialCategory = 'Ground Spices', onSele
       // Check category match
       const matchesCategory = q ? true : (
         cat.toLowerCase() === activeTab.toLowerCase() || 
-        subcat.toLowerCase() === activeTab.toLowerCase() ||
-        (activeTab === 'Ground Spices' && (cat.toLowerCase().includes('ground') || cat.toLowerCase().includes('powder'))) ||
-        (activeTab === 'Whole Spices' && cat.toLowerCase().includes('whole')) ||
-        (activeTab === 'Seed Spices' && cat.toLowerCase().includes('seed')) ||
-        (activeTab === 'Blended Spices' && (cat.toLowerCase().includes('blend') || cat.toLowerCase().includes('masala'))) ||
-        (activeTab === 'Exotic & Premium Spices' && (cat.toLowerCase().includes('exotic') || cat.toLowerCase().includes('saffron') || cat.toLowerCase().includes('vanilla')))
+        subcat.toLowerCase() === activeTab.toLowerCase()
       );
+
+      // Check subcategory filter match if active
+      let matchesSubcategory = true;
+      if (activeSubcategory && activeSubcategory !== 'All' && !activeSubcategory.startsWith('All ')) {
+        matchesSubcategory = subcat.toLowerCase() === activeSubcategory.toLowerCase();
+      }
 
       // Search match
       const matchesSearch = q === '' || 
@@ -142,9 +109,9 @@ export default function ProductsPage({ initialCategory = 'Ground Spices', onSele
         cat.toLowerCase().includes(q) ||
         subcat.toLowerCase().includes(q);
       
-      return matchesCategory && matchesSearch;
+      return matchesCategory && matchesSubcategory && matchesSearch;
     });
-  }, [activeTab, searchTerm, productsList]);
+  }, [activeTab, activeSubcategory, searchTerm, productsList]);
 
   // Counts for master tabs safely
   const categoryCounts = useMemo(() => {
@@ -159,13 +126,7 @@ export default function ProductsPage({ initialCategory = 'Ground Spices', onSele
       const subcat = String(p.subcategory || '');
       
       PRODUCT_CATEGORIES.forEach(c => {
-        if (cat.toLowerCase() === c.toLowerCase() || subcat.toLowerCase() === c.toLowerCase() ||
-            (c === 'Ground Spices' && (cat.toLowerCase().includes('ground') || cat.toLowerCase().includes('powder'))) ||
-            (c === 'Whole Spices' && cat.toLowerCase().includes('whole')) ||
-            (c === 'Seed Spices' && cat.toLowerCase().includes('seed')) ||
-            (c === 'Blended Spices' && (cat.toLowerCase().includes('blend') || cat.toLowerCase().includes('masala'))) ||
-            (c === 'Exotic & Premium Spices' && (cat.toLowerCase().includes('exotic') || cat.toLowerCase().includes('saffron') || cat.toLowerCase().includes('vanilla')))
-        ) {
+        if (cat.toLowerCase() === c.toLowerCase() || subcat.toLowerCase() === c.toLowerCase()) {
           counts[c] = (counts[c] || 0) + 1;
         }
       });
@@ -175,6 +136,7 @@ export default function ProductsPage({ initialCategory = 'Ground Spices', onSele
 
   const handleTabChange = (cat) => {
     setActiveTab(cat);
+    setActiveSubcategory('All');
     setSearchTerm('');
     window.scrollTo({ top: 380, behavior: 'smooth' });
   };
@@ -420,6 +382,38 @@ export default function ProductsPage({ initialCategory = 'Ground Spices', onSele
                 })}
               </div>
             </div>
+
+            {/* Subcategories Filter Pills (e.g. Ground Spices, Whole Spices, Seed Spices, etc. for Indian Spices) */}
+            {currentMeta.subcategories && currentMeta.subcategories.length > 0 && (
+              <div style={{ paddingTop: '14px', borderTop: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '5px', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                  <Tag size={13} style={{ color: 'var(--gold-deep)' }} /> Sub-Types:
+                </span>
+                {currentMeta.subcategories.map((subcat) => {
+                  const isSubActive = activeSubcategory === subcat || (subcat.startsWith('All ') && activeSubcategory === 'All');
+                  return (
+                    <button
+                      key={subcat}
+                      onClick={() => setActiveSubcategory(subcat.startsWith('All ') ? 'All' : subcat)}
+                      style={{
+                        padding: '6px 16px',
+                        borderRadius: '20px',
+                        fontSize: '12.5px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        border: isSubActive ? '1.5px solid var(--navy)' : '1px solid #CBD5E1',
+                        backgroundColor: isSubActive ? 'var(--navy)' : '#F8FAFC',
+                        color: isSubActive ? '#FFFFFF' : '#475569',
+                        transition: 'all 0.2s ease',
+                        boxShadow: isSubActive ? '0 4px 12px rgba(0, 33, 71, 0.15)' : 'none'
+                      }}
+                    >
+                      {subcat}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
