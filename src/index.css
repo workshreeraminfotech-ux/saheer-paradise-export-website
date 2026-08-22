@@ -3478,7 +3478,22 @@ img, video, iframe, canvas, svg {
   }
 }
 
+/* Responsive Display Utilities */
+.mobile-hamburger-btn {
+  display: none !important;
+}
 
+@media (max-width: 991px) {
+  .mobile-hamburger-btn {
+    display: flex !important;
+  }
+  .d-none-mobile {
+    display: none !important;
+  }
+}
 
-
-
+@media (min-width: 992px) {
+  .d-none-desktop {
+    display: none !important;
+  }
+}

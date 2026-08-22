@@ -275,10 +275,10 @@ export default function Navbar({ activePage, onNavigate }) {
                 <ArrowRight size={15} />
               </button>
 
-              {/* Mobile Hamburger Toggle Button */}
+              {/* Mobile Hamburger Toggle Button (Hidden on PC/Desktop) */}
               <button
                 onClick={() => setMobileOpen(!mobileOpen)}
-                className="d-none-desktop"
+                className="mobile-hamburger-btn"
                 style={{
                   background: 'none',
                   border: '1.5px solid var(--border)',
@@ -286,7 +286,6 @@ export default function Navbar({ activePage, onNavigate }) {
                   padding: '10px',
                   color: 'var(--navy)',
                   cursor: 'pointer',
-                  display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}
