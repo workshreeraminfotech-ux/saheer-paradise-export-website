@@ -97,21 +97,28 @@ function fromFirestoreFields(fields) {
 
 // --- DIRECT CLOUD DATABASE OPERATIONS ---
 
-// 1. Fetch All Documents from a Collection
+// 1. Fetch All Documents from a Collection (Full Multi-Page Pagination Loop)
 export async function fetchCollectionFromCloud(collectionName) {
-  const url = getFirestoreUrl(collectionName, 'pageSize=1000');
   try {
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.warn(`[Firebase] Fetch returned status ${res.status} for collection "${collectionName}"`);
-      return null;
-    }
-    const data = await res.json();
-    if (!data.documents || !Array.isArray(data.documents)) {
-      return [];
-    }
+    let allDocs = [];
+    let pageToken = '';
 
-    return data.documents.map(doc => {
+    do {
+      const query = pageToken ? `pageToken=${encodeURIComponent(pageToken)}` : '';
+      const url = getFirestoreUrl(collectionName, query);
+      const res = await fetch(url);
+      if (!res.ok) {
+        console.warn(`[Firebase] Fetch returned status ${res.status} for collection "${collectionName}"`);
+        break;
+      }
+      const data = await res.json();
+      if (data.documents && Array.isArray(data.documents)) {
+        allDocs.push(...data.documents);
+      }
+      pageToken = data.nextPageToken || '';
+    } while (pageToken);
+
+    return allDocs.map(doc => {
       const parsed = fromFirestoreFields(doc.fields);
       if (!parsed.id) {
         const parts = doc.name.split('/');
