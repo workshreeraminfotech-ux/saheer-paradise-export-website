@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { PRODUCT_CATEGORIES } from '../data/products';
 import { useStoreProducts } from '../utils/useStore';
+import { normalizeProduct } from '../utils/adminStore';
 
 const CATEGORY_META = {
   'Indian Spices': {
@@ -83,55 +84,44 @@ export default function ProductsPage({ initialCategory = 'Indian Spices', onSele
   const currentMeta = CATEGORY_META[activeTab] || CATEGORY_META['Indian Spices'];
   const HeaderIcon = currentMeta.icon || Flame;
 
-  // Filter logic safely
+  // Filter logic safely with strict category isolation
   const filteredProducts = useMemo(() => {
     const list = Array.isArray(productsList) ? productsList : [];
     const q = searchTerm.trim().toLowerCase();
 
     return list.filter(product => {
       if (!product) return false;
-      const title = String(product.title || product.name || '');
-      const desc = String(product.description || product.desc || '');
-      const cat = String(product.category || product.cat || '');
-      const subcat = String(product.subcategory || '');
-      const origin = String(product.origin || '');
-      const hs = String(product.hsCode || '');
+      const normalized = normalizeProduct(product);
+      if (!normalized) return false;
 
-      // Check category match
-      const matchesCategory = q ? true : (
-        cat.toLowerCase() === activeTab.toLowerCase() || 
-        subcat.toLowerCase() === activeTab.toLowerCase() ||
-        (activeTab === 'Indian Spices' && (
-          cat.toLowerCase().includes('spice') || 
-          subcat.toLowerCase().includes('spice') ||
-          subcat.toLowerCase().includes('ground') ||
-          subcat.toLowerCase().includes('whole') ||
-          subcat.toLowerCase().includes('seed') ||
-          subcat.toLowerCase().includes('blend') ||
-          subcat.toLowerCase().includes('exotic')
-        ))
-      );
+      const prodCat = normalized.category || 'Indian Spices';
+      const prodSubCat = normalized.subcategory || '';
+      const title = String(normalized.title || normalized.name || '');
+      const desc = String(normalized.description || normalized.desc || '');
+      const hs = String(normalized.hsCode || '');
 
-      // Check subcategory filter match if active
+      // Strict Category match (no loose substring bleed)
+      const matchesCategory = prodCat.toLowerCase() === activeTab.toLowerCase();
+      if (!matchesCategory) return false;
+
+      // Subcategory filter match if active
       let matchesSubcategory = true;
       if (activeSubcategory && activeSubcategory !== 'All' && !activeSubcategory.startsWith('All ')) {
-        matchesSubcategory = subcat.toLowerCase() === activeSubcategory.toLowerCase();
+        matchesSubcategory = prodSubCat.toLowerCase() === activeSubcategory.toLowerCase();
       }
 
-      // Search match
+      // Search match inside the selected category
       const matchesSearch = q === '' || 
         title.toLowerCase().includes(q) || 
         desc.toLowerCase().includes(q) ||
-        origin.toLowerCase().includes(q) ||
         hs.toLowerCase().includes(q) ||
-        cat.toLowerCase().includes(q) ||
-        subcat.toLowerCase().includes(q);
+        prodSubCat.toLowerCase().includes(q);
       
-      return matchesCategory && matchesSubcategory && matchesSearch;
+      return matchesSubcategory && matchesSearch;
     });
   }, [activeTab, activeSubcategory, searchTerm, productsList]);
 
-  // Counts for master tabs safely
+  // Exact Counts for master tabs
   const categoryCounts = useMemo(() => {
     const counts = {};
     PRODUCT_CATEGORIES.forEach(c => {
@@ -140,26 +130,11 @@ export default function ProductsPage({ initialCategory = 'Indian Spices', onSele
 
     (productsList || []).forEach(p => {
       if (!p) return;
-      const cat = String(p.category || p.cat || '');
-      const subcat = String(p.subcategory || '');
-      
-      PRODUCT_CATEGORIES.forEach(c => {
-        if (
-          cat.toLowerCase() === c.toLowerCase() || 
-          subcat.toLowerCase() === c.toLowerCase() ||
-          (c === 'Indian Spices' && (
-            cat.toLowerCase().includes('spice') || 
-            subcat.toLowerCase().includes('spice') ||
-            subcat.toLowerCase().includes('ground') ||
-            subcat.toLowerCase().includes('whole') ||
-            subcat.toLowerCase().includes('seed') ||
-            subcat.toLowerCase().includes('blend') ||
-            subcat.toLowerCase().includes('exotic')
-          ))
-        ) {
-          counts[c] = (counts[c] || 0) + 1;
-        }
-      });
+      const normalized = normalizeProduct(p);
+      const cat = normalized ? normalized.category : '';
+      if (counts[cat] !== undefined) {
+        counts[cat]++;
+      }
     });
     return counts;
   }, [productsList]);
