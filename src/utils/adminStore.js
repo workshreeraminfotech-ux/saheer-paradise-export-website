@@ -133,35 +133,93 @@ export function normalizeProduct(p) {
 
 // Merge default catalog with custom / cloud catalog
 function mergeWithDefaultProducts(incomingList = []) {
-  const normalizedIncoming = (incomingList || []).map(normalizeProduct).filter(Boolean);
-  const incomingMap = new Map();
-  normalizedIncoming.forEach(p => incomingMap.set(p.id, p));
-
-  // Overlay on INITIAL_PRODUCTS to preserve local assets if not overridden
-  const merged = INITIAL_PRODUCTS.map(initial => {
-    if (incomingMap.has(initial.id)) {
-      const cloudItem = incomingMap.get(initial.id);
-      incomingMap.delete(initial.id);
-      return {
-        ...initial,
-        ...cloudItem,
-        image: cloudItem.image || initial.image,
-        category: cloudItem.category || initial.category,
-        subcategory: cloudItem.subcategory || initial.subcategory
-      };
-    }
-    return initial;
-  });
-
-  // Append any newly added custom products
-  for (const [_, customProd] of incomingMap.entries()) {
-    merged.push(customProd);
+  if (!incomingList || !Array.isArray(incomingList) || incomingList.length === 0) {
+    return INITIAL_PRODUCTS.map(normalizeProduct);
   }
 
-  return merged;
+  // Create lookup of initial products for fallback assets
+  const initialMap = new Map();
+  INITIAL_PRODUCTS.forEach(p => initialMap.set(p.id, p));
+
+  // Map authoritative cloud items, ensuring fallback assets if image is not custom
+  const result = incomingList.map(item => {
+    const norm = normalizeProduct(item);
+    const fallback = initialMap.get(norm.id);
+    return {
+      ...(fallback || {}),
+      ...norm,
+      image: norm.image || (fallback ? fallback.image : '')
+    };
+  });
+
+  return result;
 }
 
-// Initial Sync from IndexedDB & LocalStorage & Firebase Cloud on startup
+// Global active sync promise
+let cloudSyncPromise = null;
+
+export function syncStoreWithCloud() {
+  if (typeof window === 'undefined') return Promise.resolve();
+  
+  cloudSyncPromise = (async () => {
+    try {
+      const [cloudProds, cloudBlogs, cloudCerts, cloudEnqs] = await Promise.all([
+        fetchCollectionFromCloud('products'),
+        fetchCollectionFromCloud('blogs'),
+        fetchCollectionFromCloud('certificates'),
+        fetchCollectionFromCloud('enquiries')
+      ]);
+
+      let hasCloudUpdate = false;
+      if (cloudProds && Array.isArray(cloudProds) && cloudProds.length > 0) {
+        const merged = mergeWithDefaultProducts(cloudProds);
+        memoryProducts = merged;
+        idbSet('marvex_products', merged);
+        try {
+          localStorage.setItem('marvex_products', JSON.stringify(merged));
+        } catch (e) {}
+        hasCloudUpdate = true;
+      }
+
+      if (cloudBlogs && Array.isArray(cloudBlogs) && cloudBlogs.length > 0) {
+        memoryBlogs = cloudBlogs;
+        idbSet('marvex_blogs', cloudBlogs);
+        try {
+          localStorage.setItem('marvex_blogs', JSON.stringify(cloudBlogs));
+        } catch (e) {}
+        hasCloudUpdate = true;
+      }
+
+      if (cloudCerts && Array.isArray(cloudCerts) && cloudCerts.length > 0) {
+        memoryCerts = cloudCerts;
+        idbSet('marvex_certs', cloudCerts);
+        try {
+          localStorage.setItem('marvex_certs', JSON.stringify(cloudCerts));
+        } catch (e) {}
+        hasCloudUpdate = true;
+      }
+
+      if (cloudEnqs && Array.isArray(cloudEnqs) && cloudEnqs.length > 0) {
+        memoryEnquiries = cloudEnqs;
+        idbSet('marvex_enquiries', cloudEnqs);
+        try {
+          localStorage.setItem('marvex_enquiries', JSON.stringify(cloudEnqs));
+        } catch (e) {}
+        hasCloudUpdate = true;
+      }
+
+      if (hasCloudUpdate) {
+        notifyStoreUpdate();
+      }
+    } catch (cloudErr) {
+      console.warn('[Store] Live Cloud sync error:', cloudErr);
+    }
+  })();
+
+  return cloudSyncPromise;
+}
+
+// Initial Sync on script execution
 if (typeof window !== 'undefined') {
   // 1. Quick load from localStorage (if any)
   try {
@@ -175,7 +233,7 @@ if (typeof window !== 'undefined') {
     if (le) memoryEnquiries = JSON.parse(le);
   } catch (e) {}
 
-  // 2. Load complete dataset from IndexedDB & Live Cloud
+  // 2. Load from IndexedDB and fetch live Firebase Firestore
   (async () => {
     try {
       const [idbProds, idbBlogs, idbCerts, idbEnqs] = await Promise.all([
@@ -207,54 +265,8 @@ if (typeof window !== 'undefined') {
         notifyStoreUpdate();
       }
 
-      // 3. Load latest direct live dataset from Firebase Cloud Firestore (Permanent worldwide sync)
-      try {
-        const [cloudProds, cloudBlogs, cloudCerts, cloudEnqs] = await Promise.all([
-          fetchCollectionFromCloud('products'),
-          fetchCollectionFromCloud('blogs'),
-          fetchCollectionFromCloud('certificates'),
-          fetchCollectionFromCloud('enquiries')
-        ]);
-
-        let hasCloudUpdate = false;
-        if (cloudProds && Array.isArray(cloudProds) && cloudProds.length > 0) {
-          const merged = mergeWithDefaultProducts(cloudProds);
-          memoryProducts = merged;
-          idbSet('marvex_products', merged);
-          hasCloudUpdate = true;
-        } else if (cloudProds && Array.isArray(cloudProds) && cloudProds.length === 0) {
-          // Cloud is initialized fresh: auto-upload current default items to Firebase
-          const prodsToSeed = memoryProducts || INITIAL_PRODUCTS;
-          syncAllToCloud('products', prodsToSeed).catch(() => {});
-        }
-
-        if (cloudBlogs && Array.isArray(cloudBlogs) && cloudBlogs.length > 0) {
-          memoryBlogs = cloudBlogs;
-          idbSet('marvex_blogs', cloudBlogs);
-          hasCloudUpdate = true;
-        } else if (cloudBlogs && Array.isArray(cloudBlogs) && cloudBlogs.length === 0) {
-          const blogsToSeed = memoryBlogs || INITIAL_BLOGS;
-          syncAllToCloud('blogs', blogsToSeed).catch(() => {});
-        }
-
-        if (cloudCerts && Array.isArray(cloudCerts) && cloudCerts.length > 0) {
-          memoryCerts = cloudCerts;
-          idbSet('marvex_certs', cloudCerts);
-          hasCloudUpdate = true;
-        }
-
-        if (cloudEnqs && Array.isArray(cloudEnqs) && cloudEnqs.length > 0) {
-          memoryEnquiries = cloudEnqs;
-          idbSet('marvex_enquiries', cloudEnqs);
-          hasCloudUpdate = true;
-        }
-
-        if (hasCloudUpdate) {
-          notifyStoreUpdate();
-        }
-      } catch (cloudErr) {
-        console.warn('[Store] Live Cloud sync skipped:', cloudErr);
-      }
+      // 3. Perform immediate live Cloud sync
+      await syncStoreWithCloud();
     } catch (e) {}
   })();
 }

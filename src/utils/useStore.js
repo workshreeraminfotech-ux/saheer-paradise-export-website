@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getProducts, getBlogs, getCertificates, getEnquiries } from './adminStore';
+import { getProducts, getBlogs, getCertificates, getEnquiries, syncStoreWithCloud } from './adminStore';
 
 export function useStoreProducts() {
   const [products, setProducts] = useState(() => {
@@ -8,6 +8,9 @@ export function useStoreProducts() {
   });
 
   useEffect(() => {
+    // Initial active sync with live Firebase Firestore
+    syncStoreWithCloud();
+
     const handleUpdate = () => {
       const list = getProducts();
       setProducts(Array.isArray(list) ? list : []);
@@ -26,6 +29,8 @@ export function useStoreBlogs() {
   });
 
   useEffect(() => {
+    syncStoreWithCloud();
+
     const handleUpdate = () => {
       const list = getBlogs();
       setBlogs(Array.isArray(list) ? list : []);
@@ -44,6 +49,8 @@ export function useStoreCertificates() {
   });
 
   useEffect(() => {
+    syncStoreWithCloud();
+
     const handleUpdate = () => {
       const list = getCertificates();
       setCerts(Array.isArray(list) ? list : []);
@@ -62,6 +69,8 @@ export function useStoreEnquiries() {
   });
 
   useEffect(() => {
+    syncStoreWithCloud();
+
     const handleUpdate = () => {
       const list = getEnquiries();
       setEnquiries(Array.isArray(list) ? list : []);
