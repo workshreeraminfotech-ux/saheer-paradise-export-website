@@ -80,12 +80,93 @@ export function notifyStoreUpdate() {
   } catch (e) {}
 }
 
+// Helper to normalize product category and subcategory safely
+export function normalizeProduct(p) {
+  if (!p) return null;
+  let category = p.category || p.cat || 'Indian Spices';
+  let subcategory = p.subcategory || '';
+  
+  const lowerCat = String(category).trim().toLowerCase();
+  if (lowerCat.includes('ground spice') || lowerCat === 'ground spices') {
+    category = 'Indian Spices';
+    subcategory = subcategory || 'Ground Spices';
+  } else if (lowerCat.includes('whole spice') || lowerCat === 'whole spices') {
+    category = 'Indian Spices';
+    subcategory = subcategory || 'Whole Spices';
+  } else if (lowerCat.includes('seed spice') || lowerCat === 'seed spices') {
+    category = 'Indian Spices';
+    subcategory = subcategory || 'Seed Spices';
+  } else if (lowerCat.includes('blend') || lowerCat === 'blended spices') {
+    category = 'Indian Spices';
+    subcategory = subcategory || 'Blended Spices';
+  } else if (lowerCat.includes('exotic') || lowerCat.includes('premium')) {
+    category = 'Indian Spices';
+    subcategory = subcategory || 'Exotic & Premium';
+  } else if (lowerCat.includes('spice') || lowerCat === 'spices') {
+    category = 'Indian Spices';
+    subcategory = subcategory || 'Ground Spices';
+  } else if (lowerCat.includes('agro') || lowerCat.includes('commodit')) {
+    category = 'Agro Commodities';
+    subcategory = subcategory || 'Rice & Grains';
+  } else if (lowerCat.includes('machin')) {
+    category = 'Machinery';
+    subcategory = subcategory || 'Processing Machinery';
+  } else if (lowerCat.includes('pipe')) {
+    category = 'Pipes';
+    subcategory = subcategory || 'Stainless Steel Pipes';
+  }
+
+  if (!subcategory) {
+    if (category === 'Indian Spices') subcategory = 'Ground Spices';
+    else if (category === 'Agro Commodities') subcategory = 'Rice & Grains';
+    else if (category === 'Machinery') subcategory = 'Processing Machinery';
+    else if (category === 'Pipes') subcategory = 'Stainless Steel Pipes';
+  }
+
+  return {
+    ...p,
+    category,
+    cat: category,
+    subcategory
+  };
+}
+
+// Merge default catalog with custom / cloud catalog
+function mergeWithDefaultProducts(incomingList = []) {
+  const normalizedIncoming = (incomingList || []).map(normalizeProduct).filter(Boolean);
+  const incomingMap = new Map();
+  normalizedIncoming.forEach(p => incomingMap.set(p.id, p));
+
+  // Overlay on INITIAL_PRODUCTS to preserve local assets if not overridden
+  const merged = INITIAL_PRODUCTS.map(initial => {
+    if (incomingMap.has(initial.id)) {
+      const cloudItem = incomingMap.get(initial.id);
+      incomingMap.delete(initial.id);
+      return {
+        ...initial,
+        ...cloudItem,
+        image: cloudItem.image || initial.image,
+        category: cloudItem.category || initial.category,
+        subcategory: cloudItem.subcategory || initial.subcategory
+      };
+    }
+    return initial;
+  });
+
+  // Append any newly added custom products
+  for (const [_, customProd] of incomingMap.entries()) {
+    merged.push(customProd);
+  }
+
+  return merged;
+}
+
 // Initial Sync from IndexedDB & LocalStorage & Firebase Cloud on startup
 if (typeof window !== 'undefined') {
   // 1. Quick load from localStorage (if any)
   try {
     const lp = localStorage.getItem('marvex_products');
-    if (lp) memoryProducts = JSON.parse(lp);
+    if (lp) memoryProducts = mergeWithDefaultProducts(JSON.parse(lp));
     const lb = localStorage.getItem('marvex_blogs');
     if (lb) memoryBlogs = JSON.parse(lb);
     const lc = localStorage.getItem('marvex_certs');
@@ -94,7 +175,7 @@ if (typeof window !== 'undefined') {
     if (le) memoryEnquiries = JSON.parse(le);
   } catch (e) {}
 
-  // 2. Load complete high-capacity dataset from IndexedDB
+  // 2. Load complete dataset from IndexedDB & Live Cloud
   (async () => {
     try {
       const [idbProds, idbBlogs, idbCerts, idbEnqs] = await Promise.all([
@@ -106,7 +187,7 @@ if (typeof window !== 'undefined') {
 
       let hasUpdate = false;
       if (idbProds && Array.isArray(idbProds) && idbProds.length > 0) {
-        memoryProducts = idbProds;
+        memoryProducts = mergeWithDefaultProducts(idbProds);
         hasUpdate = true;
       }
       if (idbBlogs && Array.isArray(idbBlogs) && idbBlogs.length > 0) {
@@ -137,8 +218,9 @@ if (typeof window !== 'undefined') {
 
         let hasCloudUpdate = false;
         if (cloudProds && Array.isArray(cloudProds) && cloudProds.length > 0) {
-          memoryProducts = cloudProds;
-          idbSet('marvex_products', cloudProds);
+          const merged = mergeWithDefaultProducts(cloudProds);
+          memoryProducts = merged;
+          idbSet('marvex_products', merged);
           hasCloudUpdate = true;
         } else if (cloudProds && Array.isArray(cloudProds) && cloudProds.length === 0) {
           // Cloud is initialized fresh: auto-upload current default items to Firebase
@@ -251,21 +333,25 @@ export function getProducts() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          memoryProducts = parsed;
-          return parsed;
+          const merged = mergeWithDefaultProducts(parsed);
+          memoryProducts = merged;
+          return merged;
         }
       }
     }
   } catch (e) {}
-  return INITIAL_PRODUCTS || [];
+  const initialMerged = mergeWithDefaultProducts(INITIAL_PRODUCTS);
+  memoryProducts = initialMerged;
+  return initialMerged;
 }
 
 export function saveProducts(productsList) {
-  memoryProducts = productsList;
-  idbSet('marvex_products', productsList);
+  const normalized = (productsList || []).map(normalizeProduct).filter(Boolean);
+  memoryProducts = normalized;
+  idbSet('marvex_products', normalized);
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('marvex_products', JSON.stringify(productsList));
+      localStorage.setItem('marvex_products', JSON.stringify(normalized));
     }
   } catch (e) {}
   notifyStoreUpdate();
@@ -273,11 +359,12 @@ export function saveProducts(productsList) {
 
 export async function addProduct(newProd) {
   const list = getProducts();
+  const normalizedNew = normalizeProduct(newProd);
   const prodWithId = {
-    ...newProd,
-    id: newProd.id || `prod-${Date.now()}`
+    ...normalizedNew,
+    id: normalizedNew.id || `prod-${Date.now()}`
   };
-  const updated = [prodWithId, ...list];
+  const updated = [prodWithId, ...list.filter(p => p.id !== prodWithId.id)];
   saveProducts(updated);
   saveDocToCloud('products', prodWithId.id, prodWithId).catch(() => {});
   return updated;
@@ -285,9 +372,10 @@ export async function addProduct(newProd) {
 
 export async function updateProduct(updatedProd) {
   const list = getProducts();
-  const updated = list.map(p => (p.id === updatedProd.id ? { ...p, ...updatedProd } : p));
+  const normalizedUpdated = normalizeProduct(updatedProd);
+  const updated = list.map(p => (p.id === normalizedUpdated.id ? { ...p, ...normalizedUpdated } : p));
   saveProducts(updated);
-  saveDocToCloud('products', updatedProd.id, updatedProd).catch(() => {});
+  saveDocToCloud('products', normalizedUpdated.id, normalizedUpdated).catch(() => {});
   return updated;
 }
 
@@ -297,6 +385,53 @@ export async function deleteProduct(id) {
   saveProducts(updated);
   deleteDocFromCloud('products', id).catch(() => {});
   return updated;
+}
+
+// Force re-fetch from Firebase live database
+export async function reloadFromCloud() {
+  try {
+    const [cloudProds, cloudBlogs, cloudCerts, cloudEnqs] = await Promise.all([
+      fetchCollectionFromCloud('products'),
+      fetchCollectionFromCloud('blogs'),
+      fetchCollectionFromCloud('certificates'),
+      fetchCollectionFromCloud('enquiries')
+    ]);
+
+    if (cloudProds && Array.isArray(cloudProds)) {
+      const merged = mergeWithDefaultProducts(cloudProds);
+      memoryProducts = merged;
+      idbSet('marvex_products', merged);
+    }
+    if (cloudBlogs && Array.isArray(cloudBlogs)) {
+      memoryBlogs = cloudBlogs;
+      idbSet('marvex_blogs', cloudBlogs);
+    }
+    if (cloudCerts && Array.isArray(cloudCerts)) {
+      memoryCerts = cloudCerts;
+      idbSet('marvex_certs', cloudCerts);
+    }
+    if (cloudEnqs && Array.isArray(cloudEnqs)) {
+      memoryEnquiries = cloudEnqs;
+      idbSet('marvex_enquiries', cloudEnqs);
+    }
+    notifyStoreUpdate();
+    return { success: true, count: memoryProducts.length };
+  } catch (err) {
+    console.error('Failed to reload from cloud:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+// 1-Click Sync All Master Products to Firebase
+export async function syncAllMasterProductsToCloud() {
+  const allProds = getProducts();
+  let successCount = 0;
+  for (const prod of allProds) {
+    const normalized = normalizeProduct(prod);
+    const ok = await saveDocToCloud('products', normalized.id, normalized);
+    if (ok) successCount++;
+  }
+  return { success: true, count: successCount, total: allProds.length };
 }
 
 // --- BLOGS STORE ---

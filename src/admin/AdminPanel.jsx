@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Package, FileText, Award, LogOut, Plus, Trash2, Edit3, Search, 
   CheckCircle2, X, Upload, ShieldCheck, ExternalLink, RefreshCw,
   Inbox, MessageSquare, Mail, Phone, Clock, Globe, AlertCircle, Download,
-  Check, ArrowRight
+  Check, ArrowRight, Cloud, CloudRain, Database, Eye, Flame, Wheat, Cog, Cylinder, Filter, Sparkles
 } from 'lucide-react';
 import AdminLogin from './AdminLogin';
 import { 
@@ -11,7 +11,8 @@ import {
   getProducts, addProduct, updateProduct, deleteProduct,
   getBlogs, addBlog, updateBlog, deleteBlog,
   getCertificates, addCertificate, updateCertificate, deleteCertificate,
-  getEnquiries, updateEnquiryStatus, deleteEnquiry, exportEnquiriesCSV
+  getEnquiries, updateEnquiryStatus, deleteEnquiry, exportEnquiriesCSV,
+  reloadFromCloud, syncAllMasterProductsToCloud, normalizeProduct
 } from '../utils/adminStore';
 import { PRODUCT_CATEGORIES } from '../data/products';
 
@@ -43,8 +44,9 @@ export const CATEGORY_SUBCATEGORIES = {
 
 export default function AdminPanel() {
   const [authenticated, setAuthenticated] = useState(isAdminLoggedIn());
-  const [activeTab, setActiveTab] = useState('products'); // 'products' | 'product_enquiries' | 'contact_enquiries' | 'blogs' | 'certs'
+  const [activeTab, setActiveTab] = useState('products'); // 'products' | 'product_enquiries' | 'contact_enquiries' | 'blogs' | 'certs' | 'cloud'
   const [toast, setToast] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Stores
   const [products, setProductsState] = useState(getProducts());
@@ -54,9 +56,11 @@ export default function AdminPanel() {
   const [selectedEnquiry, setSelectedEnquiry] = useState(null);
   const [enquiryFilter, setEnquiryFilter] = useState('all'); // 'all' | 'product_quote' | 'contact_form'
 
-  // Search & Filter State
+  // Search & Filter State for Products
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCat, setSelectedCat] = useState('All');
+  const [selectedSubCat, setSelectedSubCat] = useState('All');
+  const [previewImage, setPreviewImage] = useState(null);
 
   // Modal States
   const [showProductModal, setShowProductModal] = useState(false);
@@ -82,42 +86,30 @@ export default function AdminPanel() {
   });
 
   // Re-fetch data on activeTab change or mount
-  useEffect(() => {
-    if (authenticated) {
-      setProductsState(getProducts());
-      setBlogsState(getBlogs());
-      setCertsState(getCertificates());
-      setEnquiriesState(getEnquiries());
-    }
-  }, [authenticated, activeTab]);
-
-  // --- ENQUIRY ACTIONS ---
-  const handleToggleEnquiryStatus = async (id, currentStatus) => {
-    const newStatus = currentStatus === 'New' ? 'Replied' : 'New';
-    const updated = await updateEnquiryStatus(id, newStatus);
-    setEnquiriesState(Array.isArray(updated) ? updated : getEnquiries());
-    showNotification(`Enquiry status updated to ${newStatus}.`);
-  };
-
-  const handleDeleteEnquiry = async (id, name) => {
-    if (window.confirm(`Delete enquiry from "${name}"?`)) {
-      const updated = await deleteEnquiry(id);
-      setEnquiriesState(Array.isArray(updated) ? updated : getEnquiries());
-      showNotification(`Enquiry deleted.`);
-    }
-  };
-
-  const showNotification = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 3500);
-  };
-
-  const handleLoginSuccess = () => {
-    setAuthenticated(true);
+  const refreshLocalState = () => {
     setProductsState(getProducts());
     setBlogsState(getBlogs());
     setCertsState(getCertificates());
     setEnquiriesState(getEnquiries());
+  };
+
+  useEffect(() => {
+    if (authenticated) {
+      refreshLocalState();
+    }
+    const handleGlobalUpdate = () => refreshLocalState();
+    window.addEventListener('priya_store_updated', handleGlobalUpdate);
+    return () => window.removeEventListener('priya_store_updated', handleGlobalUpdate);
+  }, [authenticated, activeTab]);
+
+  const showNotification = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 4000);
+  };
+
+  const handleLoginSuccess = () => {
+    setAuthenticated(true);
+    refreshLocalState();
     showNotification('Welcome back, Admin!');
   };
 
@@ -126,11 +118,51 @@ export default function AdminPanel() {
     setAuthenticated(false);
   };
 
-  if (!authenticated) {
-    return <AdminLogin onLoginSuccess={handleLoginSuccess} />;
-  }
+  // 1-Click Cloud Re-sync Handler
+  const handleReloadCloud = async () => {
+    setIsSyncing(true);
+    const res = await reloadFromCloud();
+    setIsSyncing(false);
+    if (res.success) {
+      refreshLocalState();
+      showNotification(`Live Firebase Cloud synced successfully! (${res.count} products active)`);
+    } else {
+      showNotification(`Cloud sync note: Local cache is active.`);
+    }
+  };
 
-  // --- IMAGE FILE CONVERTER WITH AUTOMATIC ULTRA-COMPACT COMPRESSION ---
+  // 1-Click Master Catalog Push to Cloud
+  const handlePushAllMasterToCloud = async () => {
+    if (window.confirm('Do you want to sync all master products and custom products directly to live Firebase Firestore?')) {
+      setIsSyncing(true);
+      const res = await syncAllMasterProductsToCloud();
+      setIsSyncing(false);
+      refreshLocalState();
+      showNotification(`Pushed & verified ${res.count}/${res.total} products on Firebase Firestore! 🚀`);
+    }
+  };
+
+  // Export Full JSON Backup
+  const handleExportFullBackup = () => {
+    const backupData = {
+      exportDate: new Date().toISOString(),
+      company: 'Saheer Paradise Export',
+      products: getProducts(),
+      blogs: getBlogs(),
+      certificates: getCertificates(),
+      enquiries: getEnquiries()
+    };
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `saheer_paradise_backup_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotification('Full JSON backup downloaded successfully!');
+  };
+
+  // Image Upload Handler with High-Ratio Browser Compression
   const handleImageFileChange = (e, callback) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -223,7 +255,7 @@ export default function AdminPanel() {
         subcategory: prodForm.subcategory
       });
       setProductsState(updated);
-      showNotification(`Product "${prodForm.title}" saved & synced live!`);
+      showNotification(`Product "${prodForm.title}" updated & saved live!`);
     } else {
       const updated = await addProduct({ 
         ...prodForm, 
@@ -232,7 +264,7 @@ export default function AdminPanel() {
         subcategory: prodForm.subcategory
       });
       setProductsState(updated);
-      showNotification(`New Product "${prodForm.title}" added & synced live!`);
+      showNotification(`New Product "${prodForm.title}" created & saved live!`);
     }
     setShowProductModal(false);
   };
@@ -249,7 +281,7 @@ export default function AdminPanel() {
   const openAddBlog = () => {
     setEditingBlog(null);
     setBlogForm({
-      title: '', cat: 'Export Guide', read: '5 min read', excerpt: '', body: '', image: ''
+      title: '', cat: 'Product Guide', read: '5 min read', excerpt: '', body: '', image: ''
     });
     setShowBlogModal(true);
   };
@@ -258,7 +290,7 @@ export default function AdminPanel() {
     setEditingBlog(blog);
     setBlogForm({
       title: blog.title || '',
-      cat: blog.cat || 'Export Guide',
+      cat: blog.cat || 'Product Guide',
       read: blog.read || '5 min read',
       excerpt: blog.excerpt || '',
       body: blog.body || '',
@@ -274,11 +306,11 @@ export default function AdminPanel() {
     if (editingBlog) {
       const updated = await updateBlog({ ...editingBlog, ...blogForm });
       setBlogsState(updated);
-      showNotification(`Blog article "${blogForm.title}" saved & synced!`);
+      showNotification(`Article "${blogForm.title}" saved & synced!`);
     } else {
       const updated = await addBlog(blogForm);
       setBlogsState(updated);
-      showNotification(`New Blog article "${blogForm.title}" published & synced!`);
+      showNotification(`New Article "${blogForm.title}" published & synced!`);
     }
     setShowBlogModal(false);
   };
@@ -335,382 +367,963 @@ export default function AdminPanel() {
     }
   };
 
-  // Filtered Products
-  const filteredProducts = products.filter(p => {
-    if (!p) return false;
-    const cat = String(p.category || p.cat || '');
-    const subcat = String(p.subcategory || '');
-    const matchesCat = selectedCat === 'All' || 
-      cat.toLowerCase() === selectedCat.toLowerCase() || 
-      subcat.toLowerCase() === selectedCat.toLowerCase();
-    const q = searchQuery.trim().toLowerCase();
-    const matchesQuery = q === '' || 
-      (p.title && p.title.toLowerCase().includes(q)) ||
-      (p.origin && p.origin.toLowerCase().includes(q)) ||
-      (p.hsCode && p.hsCode.toLowerCase().includes(q));
-    return matchesCat && matchesQuery;
-  });
+  // --- ENQUIRY ACTIONS ---
+  const handleToggleEnquiryStatus = async (id, currentStatus) => {
+    const newStatus = currentStatus === 'New' ? 'Replied' : 'New';
+    const updated = await updateEnquiryStatus(id, newStatus);
+    setEnquiriesState(Array.isArray(updated) ? updated : getEnquiries());
+    showNotification(`Enquiry status updated to ${newStatus}.`);
+  };
+
+  const handleDeleteEnquiry = async (id, name) => {
+    if (window.confirm(`Delete enquiry from "${name}"?`)) {
+      const updated = await deleteEnquiry(id);
+      setEnquiriesState(Array.isArray(updated) ? updated : getEnquiries());
+      showNotification(`Enquiry deleted.`);
+    }
+  };
+
+  // Calculate Real-Time Product Counts
+  const categoryCounts = useMemo(() => {
+    const counts = { 'All': products.length, 'Indian Spices': 0, 'Agro Commodities': 0, 'Machinery': 0, 'Pipes': 0 };
+    products.forEach(p => {
+      const normalized = normalizeProduct(p);
+      const cat = normalized.category;
+      if (counts[cat] !== undefined) counts[cat]++;
+    });
+    return counts;
+  }, [products]);
+
+  // Filtered Products for Display
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      if (!p) return false;
+      const normalized = normalizeProduct(p);
+      const cat = normalized.category;
+      const subcat = normalized.subcategory || '';
+      
+      const matchesCat = selectedCat === 'All' || cat.toLowerCase() === selectedCat.toLowerCase();
+      const matchesSubCat = selectedSubCat === 'All' || subcat.toLowerCase() === selectedSubCat.toLowerCase();
+      
+      const q = searchQuery.trim().toLowerCase();
+      const matchesQuery = q === '' || 
+        (p.title && p.title.toLowerCase().includes(q)) ||
+        (p.origin && p.origin.toLowerCase().includes(q)) ||
+        (p.hsCode && p.hsCode.toLowerCase().includes(q)) ||
+        (p.specs && p.specs.toLowerCase().includes(q)) ||
+        (subcat.toLowerCase().includes(q));
+        
+      return matchesCat && matchesSubCat && matchesQuery;
+    });
+  }, [products, selectedCat, selectedSubCat, searchQuery]);
+
+  // Filtered Enquiries
+  const filteredEnquiries = useMemo(() => {
+    const list = Array.isArray(enquiries) ? enquiries : [];
+    if (enquiryFilter === 'all') return list;
+    if (enquiryFilter === 'product_quote') return list.filter(e => e.type === 'product_quote');
+    if (enquiryFilter === 'contact_form') return list.filter(e => e.type === 'contact_form' || !e.type);
+    if (enquiryFilter === 'new') return list.filter(e => e.status === 'New');
+    if (enquiryFilter === 'replied') return list.filter(e => e.status === 'Replied');
+    return list;
+  }, [enquiries, enquiryFilter]);
+
+  const newEnquiriesCount = enquiries.filter(e => e.status === 'New').length;
+
+  if (!authenticated) {
+    return <AdminLogin onLoginSuccess={handleLoginSuccess} />;
+  }
 
   return (
-    <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', fontFamily: 'var(--font-b, Inter, sans-serif)' }}>
+    <div style={{ backgroundColor: '#F1F5F9', minHeight: '100vh', fontFamily: 'var(--font-b, Inter, sans-serif)', color: '#0F172A' }}>
       
       {/* Toast Notification */}
       {toast && (
         <div style={{
           position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          backgroundColor: '#0A2240',
+          bottom: '28px',
+          right: '28px',
+          backgroundColor: '#002147',
           color: '#FFFFFF',
-          padding: '14px 24px',
+          padding: '16px 26px',
           borderRadius: '16px',
-          boxShadow: '0 12px 30px rgba(10, 34, 64, 0.3)',
-          zIndex: 2000,
+          boxShadow: '0 16px 36px rgba(0, 33, 71, 0.35)',
+          zIndex: 3500,
           display: 'flex',
           alignItems: 'center',
-          gap: '10px',
-          fontSize: '14px',
-          fontWeight: 700
+          gap: '12px',
+          fontSize: '14.5px',
+          fontWeight: 700,
+          border: '1.5px solid #38BDF8'
         }}>
-          <CheckCircle2 size={18} style={{ color: '#38BDF8' }} />
+          <CheckCircle2 size={20} style={{ color: '#38BDF8' }} />
           <span>{toast}</span>
         </div>
       )}
 
-      {/* Admin Header Navbar */}
-      <header style={{ background: 'linear-gradient(135deg, #0A2240 0%, #1B4B7A 100%)', color: '#FFFFFF', padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* Main Admin Header Navbar */}
+      <header style={{ 
+        background: 'linear-gradient(135deg, #07172C 0%, #002147 60%, #0A3266 100%)', 
+        color: '#FFFFFF', 
+        padding: '16px 0', 
+        borderBottom: '1px solid rgba(255,255,255,0.12)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 1000,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+      }}>
+        <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.2)' }}>
-              <ShieldCheck size={22} />
+            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid rgba(255,255,255,0.25)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+              <ShieldCheck size={26} style={{ color: '#38BDF8' }} />
             </div>
             <div>
-              <h2 style={{ fontSize: '18px', fontWeight: 900, margin: 0, fontFamily: 'var(--font-h, Outfit, sans-serif)' }}>
-                Saheer Paradise Export Admin Panel
-              </h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                <span style={{ fontSize: '12px', color: '#BAE6FD' }}>Website Control Center</span>
-                <span style={{ fontSize: '11px', backgroundColor: 'rgba(34, 197, 94, 0.2)', color: '#86EFAC', padding: '2px 8px', borderRadius: '100px', fontWeight: 800, border: '1px solid rgba(34, 197, 94, 0.4)' }}>
-                  🟢 Live Firebase Cloud
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h1 style={{ fontSize: '19px', fontWeight: 900, margin: 0, letterSpacing: '-0.3px', fontFamily: 'var(--font-h, Outfit, sans-serif)' }}>
+                  Saheer Paradise Export
+                </h1>
+                <span style={{ fontSize: '11px', backgroundColor: '#0284C7', color: '#FFFFFF', padding: '2px 8px', borderRadius: '6px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                  Admin Portal
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
+                <span style={{ fontSize: '12px', color: '#94A3B8' }}>Master Executive Control</span>
+                <span style={{ fontSize: '11px', backgroundColor: 'rgba(34, 197, 94, 0.18)', color: '#86EFAC', padding: '2px 10px', borderRadius: '100px', fontWeight: 800, border: '1px solid rgba(34, 197, 94, 0.4)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#4ADE80', display: 'inline-block' }}></span>
+                  Live Firebase Cloud Connected
                 </span>
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          {/* Quick Header Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <button
-              onClick={() => {
-                if (window.location.hash) window.location.hash = '';
-                if (window.location.search) window.location.search = '';
-                window.location.reload();
-              }}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#CBD5E1', border: 'none', fontSize: '13.5px', fontWeight: 600, padding: '8px 16px', borderRadius: '100px', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}
-            >
-              <span>View Main Site</span>
-              <ExternalLink size={14} />
-            </button>
-
-            <button
-              onClick={handleLogout}
+              onClick={handleReloadCloud}
+              disabled={isSyncing}
+              title="Refresh and sync data directly from Firebase Firestore"
               style={{
-                backgroundColor: 'rgba(239, 68, 68, 0.2)',
-                color: '#FCA5A5',
-                border: '1px solid rgba(239, 68, 68, 0.4)',
-                padding: '8px 16px',
-                borderRadius: '100px',
-                fontSize: '13.5px',
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: '#FFFFFF',
+                padding: '9px 15px',
+                borderRadius: '10px',
+                fontSize: '13px',
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: '6px',
+                transition: 'all 0.2s ease'
               }}
             >
-              <LogOut size={15} />
-              <span>Log Out</span>
+              <RefreshCw size={14} className={isSyncing ? 'spin' : ''} />
+              <span>{isSyncing ? 'Syncing...' : 'Sync Cloud'}</span>
+            </button>
+
+            <a
+              href="/"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                backgroundColor: '#D97706',
+                color: '#FFFFFF',
+                textDecoration: 'none',
+                padding: '9px 16px',
+                borderRadius: '10px',
+                fontSize: '13px',
+                fontWeight: 800,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 12px rgba(217, 119, 6, 0.3)'
+              }}
+            >
+              <ExternalLink size={14} />
+              <span>View Website</span>
+            </a>
+
+            <button
+              onClick={handleLogout}
+              style={{
+                backgroundColor: '#EF4444',
+                color: '#FFFFFF',
+                border: 'none',
+                padding: '9px 16px',
+                borderRadius: '10px',
+                fontSize: '13px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)'
+              }}
+            >
+              <LogOut size={14} />
+              <span>Logout</span>
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Container */}
-      <div className="container" style={{ padding: '36px 24px 80px' }}>
+      <div className="container" style={{ padding: '28px 20px 80px' }}>
         
-        {/* Dashboard Stats Row */}
-        {(() => {
-          const safeEnquiries = Array.isArray(enquiries) ? enquiries : [];
-          const productQuotesCount = safeEnquiries.filter(e => (e.source || '').toLowerCase().includes('product') || (e.source || '').toLowerCase().includes('quote')).length;
-          const contactFormCount = safeEnquiries.filter(e => (e.source || '').toLowerCase().includes('contact')).length;
-
-          return (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '20px', border: '1.5px solid #CBD5E1', boxShadow: '0 4px 16px rgba(0,33,71,0.04)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{ width: '46px', height: '46px', borderRadius: '14px', background: '#002147', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Package size={22} />
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#8C96A0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Products</span>
-                  <h3 style={{ fontSize: '26px', fontWeight: 900, color: '#002147', margin: 0 }}>{products.length}</h3>
-                </div>
-              </div>
-
-              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '20px', border: '1.5px solid #CBD5E1', boxShadow: '0 4px 16px rgba(0,33,71,0.04)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{ width: '46px', height: '46px', borderRadius: '14px', background: '#0369A1', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Inbox size={22} />
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#8C96A0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Product Quotes</span>
-                  <h3 style={{ fontSize: '26px', fontWeight: 900, color: '#0369A1', margin: 0 }}>{productQuotesCount}</h3>
-                </div>
-              </div>
-
-              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '20px', border: '1.5px solid #CBD5E1', boxShadow: '0 4px 16px rgba(0,33,71,0.04)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{ width: '46px', height: '46px', borderRadius: '14px', background: '#15803D', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Mail size={22} />
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#8C96A0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Contact Form</span>
-                  <h3 style={{ fontSize: '26px', fontWeight: 900, color: '#15803D', margin: 0 }}>{contactFormCount}</h3>
-                </div>
-              </div>
-
-              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '20px', border: '1.5px solid #CBD5E1', boxShadow: '0 4px 16px rgba(0,33,71,0.04)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{ width: '46px', height: '46px', borderRadius: '14px', background: '#002147', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <FileText size={22} />
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#8C96A0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Blog Articles</span>
-                  <h3 style={{ fontSize: '26px', fontWeight: 900, color: '#002147', margin: 0 }}>{blogs.length}</h3>
-                </div>
-              </div>
-
-              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '20px', border: '1.5px solid #CBD5E1', boxShadow: '0 4px 16px rgba(0,33,71,0.04)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{ width: '46px', height: '46px', borderRadius: '14px', background: '#002147', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Award size={22} />
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#8C96A0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Certifications</span>
-                  <h3 style={{ fontSize: '26px', fontWeight: 900, color: '#002147', margin: 0 }}>{certs.length}</h3>
-                </div>
+        {/* KPI Stats Summary Dashboard */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '28px' }}>
+          
+          <div 
+            onClick={() => { setActiveTab('products'); setSelectedCat('All'); setSelectedSubCat('All'); }}
+            style={{ backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '20px', border: '1.5px solid #E2E8F0', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: '0 4px 16px rgba(0,33,71,0.04)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Products</span>
+              <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7' }}>
+                <Package size={18} />
               </div>
             </div>
-          );
-        })()}
+            <div style={{ fontSize: '30px', fontWeight: 900, color: '#002147', marginTop: '10px' }}>{products.length}</div>
+            <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: 700 }}>🟢 All Active in Firestore</span>
+          </div>
 
-        {/* Tab Navigation Controls */}
-        {(() => {
-          const safeEnquiries = Array.isArray(enquiries) ? enquiries : [];
-          const productQuotesCount = safeEnquiries.filter(e => (e.source || '').toLowerCase().includes('product') || (e.source || '').toLowerCase().includes('quote')).length;
-          const contactFormCount = safeEnquiries.filter(e => (e.source || '').toLowerCase().includes('contact')).length;
-
-          return (
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '28px', borderBottom: '2px solid #E2E8F0', paddingBottom: '12px', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => setActiveTab('products')}
-                style={{
-                  padding: '12px 22px',
-                  borderRadius: '100px',
-                  backgroundColor: activeTab === 'products' ? '#002147' : 'transparent',
-                  color: activeTab === 'products' ? '#FFFFFF' : '#002147',
-                  border: activeTab === 'products' ? 'none' : '1.5px solid #CBD5E1',
-                  fontWeight: 800,
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <Package size={17} />
-                <span>Manage Products ({products.length})</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('product_enquiries')}
-                style={{
-                  padding: '12px 22px',
-                  borderRadius: '100px',
-                  backgroundColor: activeTab === 'product_enquiries' ? '#0369A1' : 'transparent',
-                  color: activeTab === 'product_enquiries' ? '#FFFFFF' : '#002147',
-                  border: activeTab === 'product_enquiries' ? 'none' : '1.5px solid #CBD5E1',
-                  fontWeight: 800,
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <Inbox size={17} />
-                <span>📦 Product Quote Enquiries ({productQuotesCount})</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('contact_enquiries')}
-                style={{
-                  padding: '12px 22px',
-                  borderRadius: '100px',
-                  backgroundColor: activeTab === 'contact_enquiries' ? '#15803D' : 'transparent',
-                  color: activeTab === 'contact_enquiries' ? '#FFFFFF' : '#002147',
-                  border: activeTab === 'contact_enquiries' ? 'none' : '1.5px solid #CBD5E1',
-                  fontWeight: 800,
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <Mail size={17} />
-                <span>✉️ Contact Us Enquiries ({contactFormCount})</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('blogs')}
-                style={{
-                  padding: '12px 22px',
-                  borderRadius: '100px',
-                  backgroundColor: activeTab === 'blogs' ? '#002147' : 'transparent',
-                  color: activeTab === 'blogs' ? '#FFFFFF' : '#002147',
-                  border: activeTab === 'blogs' ? 'none' : '1.5px solid #CBD5E1',
-                  fontWeight: 800,
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <FileText size={17} />
-                <span>Manage Blogs ({blogs.length})</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('certs')}
-                style={{
-                  padding: '12px 22px',
-                  borderRadius: '100px',
-                  backgroundColor: activeTab === 'certs' ? '#002147' : 'transparent',
-                  color: activeTab === 'certs' ? '#FFFFFF' : '#002147',
-                  border: activeTab === 'certs' ? 'none' : '1.5px solid #CBD5E1',
-                  fontWeight: 800,
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <Award size={17} />
-                <span>Manage Certificates ({certs.length})</span>
-              </button>
-
+          <div 
+            onClick={() => { setActiveTab('products'); setSelectedCat('Indian Spices'); setSelectedSubCat('All'); }}
+            style={{ backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '20px', border: selectedCat === 'Indian Spices' && activeTab === 'products' ? '1.5px solid #EA580C' : '1.5px solid #E2E8F0', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: '0 4px 16px rgba(0,33,71,0.04)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Indian Spices</span>
+              <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#FFF7ED', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#EA580C' }}>
+                <Flame size={18} />
+              </div>
             </div>
-          );
-        })()}
+            <div style={{ fontSize: '30px', fontWeight: 900, color: '#C2410C', marginTop: '10px' }}>{categoryCounts['Indian Spices']}</div>
+            <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>Ground, Whole, Seed, Blends</span>
+          </div>
 
+          <div 
+            onClick={() => { setActiveTab('products'); setSelectedCat('Agro Commodities'); setSelectedSubCat('All'); }}
+            style={{ backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '20px', border: selectedCat === 'Agro Commodities' && activeTab === 'products' ? '1.5px solid #16A34A' : '1.5px solid #E2E8F0', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: '0 4px 16px rgba(0,33,71,0.04)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Agro Commodities</span>
+              <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16A34A' }}>
+                <Wheat size={18} />
+              </div>
+            </div>
+            <div style={{ fontSize: '30px', fontWeight: 900, color: '#15803D', marginTop: '10px' }}>{categoryCounts['Agro Commodities']}</div>
+            <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>Rice, Wheat, Soy, Peanuts</span>
+          </div>
+
+          <div 
+            onClick={() => { setActiveTab('products'); setSelectedCat('Machinery'); setSelectedSubCat('All'); }}
+            style={{ backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '20px', border: selectedCat === 'Machinery' && activeTab === 'products' ? '1.5px solid #0284C7' : '1.5px solid #E2E8F0', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: '0 4px 16px rgba(0,33,71,0.04)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Machinery</span>
+              <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#F0F9FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7' }}>
+                <Cog size={18} />
+              </div>
+            </div>
+            <div style={{ fontSize: '30px', fontWeight: 900, color: '#0369A1', marginTop: '10px' }}>{categoryCounts['Machinery']}</div>
+            <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>Color Sorter, Pulverizers</span>
+          </div>
+
+          <div 
+            onClick={() => { setActiveTab('products'); setSelectedCat('Pipes'); setSelectedSubCat('All'); }}
+            style={{ backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '20px', border: selectedCat === 'Pipes' && activeTab === 'products' ? '1.5px solid #6366F1' : '1.5px solid #E2E8F0', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: '0 4px 16px rgba(0,33,71,0.04)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Pipes</span>
+              <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6366F1' }}>
+                <Cylinder size={18} />
+              </div>
+            </div>
+            <div style={{ fontSize: '30px', fontWeight: 900, color: '#4338CA', marginTop: '10px' }}>{categoryCounts['Pipes']}</div>
+            <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>SS, Carbon, HDPE, UPVC</span>
+          </div>
+
+          <div 
+            onClick={() => setActiveTab('product_enquiries')}
+            style={{ backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '20px', border: '1.5px solid #E2E8F0', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: '0 4px 16px rgba(0,33,71,0.04)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Client Inquiries</span>
+              <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D97706' }}>
+                <Inbox size={18} />
+              </div>
+            </div>
+            <div style={{ fontSize: '30px', fontWeight: 900, color: '#002147', marginTop: '10px' }}>{enquiries.length}</div>
+            <span style={{ fontSize: '12px', color: newEnquiriesCount > 0 ? '#DC2626' : '#16A34A', fontWeight: 800 }}>
+              {newEnquiriesCount > 0 ? `🚨 ${newEnquiriesCount} New RFQs Pending` : '✓ All Answered'}
+            </span>
+          </div>
+
+        </div>
+
+        {/* Primary Navigation Tabs */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '8px', 
+          backgroundColor: '#FFFFFF', 
+          padding: '8px', 
+          borderRadius: '18px', 
+          border: '1.5px solid #E2E8F0', 
+          marginBottom: '28px',
+          overflowX: 'auto',
+          boxShadow: '0 4px 14px rgba(0,33,71,0.03)'
+        }}>
+          <button
+            onClick={() => setActiveTab('products')}
+            style={{
+              padding: '12px 22px',
+              borderRadius: '12px',
+              border: 'none',
+              backgroundColor: activeTab === 'products' ? '#002147' : 'transparent',
+              color: activeTab === 'products' ? '#FFFFFF' : '#475569',
+              fontWeight: 800,
+              fontSize: '14px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <Package size={16} />
+            <span>Products Catalog ({products.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('product_enquiries')}
+            style={{
+              padding: '12px 22px',
+              borderRadius: '12px',
+              border: 'none',
+              backgroundColor: activeTab === 'product_enquiries' ? '#002147' : 'transparent',
+              color: activeTab === 'product_enquiries' ? '#FFFFFF' : '#475569',
+              fontWeight: 800,
+              fontSize: '14px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <Inbox size={16} />
+            <span>Product Quote RFQs ({enquiries.filter(e => e.type === 'product_quote').length})</span>
+            {enquiries.filter(e => e.type === 'product_quote' && e.status === 'New').length > 0 && (
+              <span style={{ backgroundColor: '#EF4444', color: '#FFF', fontSize: '10.5px', padding: '1px 6px', borderRadius: '100px', fontWeight: 900 }}>
+                {enquiries.filter(e => e.type === 'product_quote' && e.status === 'New').length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('contact_enquiries')}
+            style={{
+              padding: '12px 22px',
+              borderRadius: '12px',
+              border: 'none',
+              backgroundColor: activeTab === 'contact_enquiries' ? '#002147' : 'transparent',
+              color: activeTab === 'contact_enquiries' ? '#FFFFFF' : '#475569',
+              fontWeight: 800,
+              fontSize: '14px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <MessageSquare size={16} />
+            <span>Contact Messages ({enquiries.filter(e => e.type === 'contact_form' || !e.type).length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('blogs')}
+            style={{
+              padding: '12px 22px',
+              borderRadius: '12px',
+              border: 'none',
+              backgroundColor: activeTab === 'blogs' ? '#002147' : 'transparent',
+              color: activeTab === 'blogs' ? '#FFFFFF' : '#475569',
+              fontWeight: 800,
+              fontSize: '14px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <FileText size={16} />
+            <span>Articles & Blogs ({blogs.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('certs')}
+            style={{
+              padding: '12px 22px',
+              borderRadius: '12px',
+              border: 'none',
+              backgroundColor: activeTab === 'certs' ? '#002147' : 'transparent',
+              color: activeTab === 'certs' ? '#FFFFFF' : '#475569',
+              fontWeight: 800,
+              fontSize: '14px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <Award size={16} />
+            <span>Certifications ({certs.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('cloud')}
+            style={{
+              padding: '12px 22px',
+              borderRadius: '12px',
+              border: 'none',
+              backgroundColor: activeTab === 'cloud' ? '#002147' : 'transparent',
+              color: activeTab === 'cloud' ? '#FFFFFF' : '#475569',
+              fontWeight: 800,
+              fontSize: '14px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <Cloud size={16} style={{ color: activeTab === 'cloud' ? '#38BDF8' : '#0284C7' }} />
+            <span>Cloud & Backup Hub</span>
+          </button>
+        </div>
+
+        {/* ========================================================= */}
         {/* TAB 1: PRODUCTS MANAGER */}
+        {/* ========================================================= */}
         {activeTab === 'products' && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-              <div style={{ display: 'flex', gap: '12px', flex: 1, maxWidth: '600px' }}>
-                <div style={{ position: 'relative', flex: 1 }}>
-                  <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#8C96A0' }} />
+            {/* Products Toolbar */}
+            <div style={{ 
+              backgroundColor: '#FFFFFF', 
+              borderRadius: '24px', 
+              padding: '24px', 
+              border: '1.5px solid #E2E8F0', 
+              marginBottom: '24px',
+              boxShadow: '0 6px 20px rgba(0,33,71,0.04)'
+            }}>
+              
+              {/* Row 1: Search & Add Product CTA */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+                
+                <div style={{ position: 'relative', flex: 1, minWidth: '280px', maxWidth: '540px' }}>
+                  <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
                   <input
                     type="text"
-                    placeholder="Search products by title..."
+                    placeholder="Search by title, origin, HS code, or specifications..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{ width: '100%', padding: '12px 16px 12px 44px', borderRadius: '100px', border: '1.5px solid #CBD5E1', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+                    style={{
+                      width: '100%',
+                      padding: '12px 18px 12px 46px',
+                      borderRadius: '100px',
+                      border: '1.5px solid #CBD5E1',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      backgroundColor: '#F8FAFC'
+                    }}
                   />
+                  {searchQuery && (
+                    <button 
+                      onClick={() => setSearchQuery('')}
+                      style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
                 </div>
-                <select
-                  value={selectedCat}
-                  onChange={(e) => setSelectedCat(e.target.value)}
-                  style={{ padding: '12px 20px', borderRadius: '100px', border: '1.5px solid #CBD5E1', fontSize: '14px', fontWeight: 700, outline: 'none', backgroundColor: '#FFFFFF' }}
-                >
-                  <option value="All">All Categories</option>
-                  {PRODUCT_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    onClick={handlePushAllMasterToCloud}
+                    disabled={isSyncing}
+                    style={{
+                      backgroundColor: '#F0F9FF',
+                      border: '1.5px solid #BAE6FD',
+                      color: '#0369A1',
+                      padding: '12px 20px',
+                      borderRadius: '100px',
+                      fontWeight: 800,
+                      fontSize: '13.5px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <Cloud size={16} />
+                    <span>Sync to Firebase</span>
+                  </button>
+
+                  <button
+                    onClick={openAddProduct}
+                    style={{
+                      backgroundColor: '#002147',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      padding: '12px 24px',
+                      borderRadius: '100px',
+                      fontWeight: 800,
+                      fontSize: '14.5px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 14px rgba(0, 33, 71, 0.2)'
+                    }}
+                  >
+                    <Plus size={18} />
+                    <span>Add New Product</span>
+                  </button>
+                </div>
               </div>
 
-              <button
-                onClick={openAddProduct}
-                style={{ backgroundColor: '#002147', color: '#FFFFFF', border: 'none', padding: '12px 24px', borderRadius: '100px', fontWeight: 800, fontSize: '14.5px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 14px rgba(0, 33, 71, 0.15)' }}
-              >
-                <Plus size={18} />
-                <span>Add New Product</span>
-              </button>
+              {/* Row 2: 4 Master Category Filter Tabs */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', paddingTop: '16px', borderTop: '1px solid #F1F5F9' }}>
+                <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#002147', textTransform: 'uppercase', letterSpacing: '0.6px', marginRight: '4px' }}>
+                  Category:
+                </span>
+
+                <button
+                  onClick={() => { setSelectedCat('All'); setSelectedSubCat('All'); }}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '100px',
+                    border: selectedCat === 'All' ? '1.5px solid #002147' : '1px solid #CBD5E1',
+                    backgroundColor: selectedCat === 'All' ? '#002147' : '#F8FAFC',
+                    color: selectedCat === 'All' ? '#FFFFFF' : '#475569',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  All Categories ({products.length})
+                </button>
+
+                {PRODUCT_CATEGORIES.map(cat => {
+                  const isActive = selectedCat === cat;
+                  const count = categoryCounts[cat] || 0;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => { setSelectedCat(cat); setSelectedSubCat('All'); }}
+                      style={{
+                        padding: '8px 18px',
+                        borderRadius: '100px',
+                        border: isActive ? '1.5px solid #002147' : '1px solid #CBD5E1',
+                        backgroundColor: isActive ? '#002147' : '#F8FAFC',
+                        color: isActive ? '#FFFFFF' : '#475569',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      {cat === 'Indian Spices' && '🌶️'}
+                      {cat === 'Agro Commodities' && '🌾'}
+                      {cat === 'Machinery' && '⚙️'}
+                      {cat === 'Pipes' && '🏗️'}
+                      <span>{cat}</span>
+                      <span style={{ 
+                        backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : '#E2E8F0', 
+                        color: isActive ? '#FFF' : '#475569',
+                        fontSize: '11px', 
+                        padding: '1px 6px', 
+                        borderRadius: '100px' 
+                      }}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Row 3: Subcategory Filter Pills (e.g. Ground Spices, Whole Spices, Seed Spices for Indian Spices) */}
+              {selectedCat !== 'All' && CATEGORY_SUBCATEGORIES[selectedCat] && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed #E2E8F0' }}>
+                  <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#D97706', textTransform: 'uppercase', letterSpacing: '0.6px', marginRight: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Filter size={12} /> Sub-Types:
+                  </span>
+
+                  <button
+                    onClick={() => setSelectedSubCat('All')}
+                    style={{
+                      padding: '5px 14px',
+                      borderRadius: '100px',
+                      border: selectedSubCat === 'All' ? '1.5px solid #002147' : '1px solid #CBD5E1',
+                      backgroundColor: selectedSubCat === 'All' ? '#002147' : '#FFFFFF',
+                      color: selectedSubCat === 'All' ? '#FFFFFF' : '#64748B',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    All {selectedCat}
+                  </button>
+
+                  {CATEGORY_SUBCATEGORIES[selectedCat].map(subcat => {
+                    const isSubActive = selectedSubCat === subcat;
+                    return (
+                      <button
+                        key={subcat}
+                        onClick={() => setSelectedSubCat(subcat)}
+                        style={{
+                          padding: '5px 14px',
+                          borderRadius: '100px',
+                          border: isSubActive ? '1.5px solid #D97706' : '1px solid #CBD5E1',
+                          backgroundColor: isSubActive ? '#FEF3C7' : '#FFFFFF',
+                          color: isSubActive ? '#B45309' : '#475569',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {subcat}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {/* Products Table Grid */}
-            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', border: '1.5px solid #CBD5E1', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,33,71,0.04)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#F1F5F9', borderBottom: '1.5px solid #CBD5E1', color: '#002147', fontWeight: 800 }}>
-                    <th style={{ padding: '16px 20px' }}>Product</th>
-                    <th style={{ padding: '16px 20px' }}>Category</th>
-                    <th style={{ padding: '16px 20px' }}>Origin</th>
-                    <th style={{ padding: '16px 20px' }}>HS Code</th>
-                    <th style={{ padding: '16px 20px', textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProducts.map((p, idx) => (
-                    <tr key={p.id || idx} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                      <td style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <img src={p.image} alt={p.title} style={{ width: '48px', height: '48px', objectFit: 'contain', borderRadius: '10px', backgroundColor: '#F8FAFC', padding: '4px', border: '1px solid #E2E8F0' }} />
-                        <div>
-                          <strong style={{ fontSize: '15px', color: '#002147', display: 'block' }}>{p.title}</strong>
-                          <span style={{ fontSize: '12px', color: '#475569' }}>{p.desc ? p.desc.substring(0, 50) + '...' : ''}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '16px 20px', color: '#002147' }}>
-                        <span style={{ fontWeight: 800, display: 'block', fontSize: '13.5px' }}>{p.category || p.cat}</span>
-                        {p.subcategory && (
-                          <span style={{
-                            display: 'inline-block',
-                            backgroundColor: '#FEF3C7',
-                            color: '#B45309',
-                            fontSize: '11px',
-                            fontWeight: 800,
-                            padding: '2px 8px',
-                            borderRadius: '100px',
-                            marginTop: '4px',
-                            border: '1px solid #FDE68A'
-                          }}>
-                            {p.subcategory}
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ padding: '16px 20px', color: '#475569' }}>{p.origin}</td>
-                      <td style={{ padding: '16px 20px', color: '#475569', fontWeight: 600 }}>{p.hsCode || '—'}</td>
-                      <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', gap: '8px' }}>
-                          <button onClick={() => openEditProduct(p)} style={{ backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', color: '#002147', padding: '8px 12px', borderRadius: '10px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 700, fontSize: '12.5px' }}>
-                            <Edit3 size={14} /> Edit
-                          </button>
-                          <button onClick={() => handleDeleteProduct(p.id, p.title)} style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '8px 12px', borderRadius: '10px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 700, fontSize: '12.5px' }}>
-                            <Trash2 size={14} /> Delete
-                          </button>
-                        </div>
-                      </td>
+            {/* Results Count Bar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', padding: '0 6px' }}>
+              <span style={{ fontSize: '14px', fontWeight: 700, color: '#475569' }}>
+                Showing <strong style={{ color: '#002147' }}>{filteredProducts.length}</strong> items in database
+                {selectedCat !== 'All' && <span> (Category: <strong style={{ color: '#0284C7' }}>{selectedCat}</strong>)</span>}
+                {selectedSubCat !== 'All' && <span> (Sub: <strong style={{ color: '#D97706' }}>{selectedSubCat}</strong>)</span>}
+              </span>
+
+              {(searchQuery || selectedCat !== 'All' || selectedSubCat !== 'All') && (
+                <button
+                  onClick={() => { setSearchQuery(''); setSelectedCat('All'); setSelectedSubCat('All'); }}
+                  style={{ background: 'none', border: 'none', color: '#0284C7', fontSize: '13px', fontWeight: 800, cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  Reset All Filters
+                </button>
+              )}
+            </div>
+
+            {/* Products Table */}
+            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', border: '1.5px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,33,71,0.04)' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1.5px solid #CBD5E1', color: '#002147', fontWeight: 800 }}>
+                      <th style={{ padding: '16px 20px', width: '340px' }}>Product Title & Image</th>
+                      <th style={{ padding: '16px 20px', width: '180px' }}>Category & Sub-Type</th>
+                      <th style={{ padding: '16px 20px', width: '160px' }}>Origin / Sourcing</th>
+                      <th style={{ padding: '16px 20px', width: '130px' }}>HS Code</th>
+                      <th style={{ padding: '16px 20px', width: '220px' }}>Specifications</th>
+                      <th style={{ padding: '16px 20px', textAlign: 'right', width: '140px' }}>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredProducts.map((p, idx) => {
+                      const normalized = normalizeProduct(p);
+                      return (
+                        <tr key={p.id || idx} style={{ borderBottom: '1px solid #F1F5F9', transition: 'background-color 0.15s ease' }}>
+                          
+                          {/* Title & Thumbnail */}
+                          <td style={{ padding: '16px 20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                              <div 
+                                onClick={() => setPreviewImage(p.image)}
+                                title="Click to view full image"
+                                style={{ 
+                                  width: '52px', 
+                                  height: '52px', 
+                                  borderRadius: '12px', 
+                                  backgroundColor: '#F8FAFC', 
+                                  padding: '4px', 
+                                  border: '1.5px solid #E2E8F0',
+                                  cursor: 'pointer',
+                                  overflow: 'hidden',
+                                  flexShrink: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                <img src={p.image} alt={p.title} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                              </div>
+                              <div>
+                                <strong style={{ fontSize: '14.5px', color: '#002147', display: 'block', lineHeight: 1.3 }}>
+                                  {p.title}
+                                </strong>
+                                <span style={{ fontSize: '12px', color: '#64748B', marginTop: '3px', display: 'block', maxWidth: '280px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {p.description || p.desc}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Category & Subtype */}
+                          <td style={{ padding: '16px 20px' }}>
+                            <span style={{ fontWeight: 800, color: '#002147', display: 'block', fontSize: '13px' }}>
+                              {normalized.category}
+                            </span>
+                            {normalized.subcategory && (
+                              <span style={{
+                                display: 'inline-block',
+                                backgroundColor: '#FEF3C7',
+                                color: '#B45309',
+                                fontSize: '11px',
+                                fontWeight: 800,
+                                padding: '2px 8px',
+                                borderRadius: '100px',
+                                marginTop: '4px',
+                                border: '1px solid #FDE68A'
+                              }}>
+                                {normalized.subcategory}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Origin */}
+                          <td style={{ padding: '16px 20px', color: '#475569', fontSize: '13px', fontWeight: 600 }}>
+                            {p.origin || 'India'}
+                          </td>
+
+                          {/* HS Code */}
+                          <td style={{ padding: '16px 20px', color: '#002147', fontWeight: 700, fontSize: '13px' }}>
+                            <span style={{ backgroundColor: '#F1F5F9', padding: '3px 8px', borderRadius: '6px', border: '1px solid #CBD5E1' }}>
+                              {p.hsCode || 'HS 0910'}
+                            </span>
+                          </td>
+
+                          {/* Specs */}
+                          <td style={{ padding: '16px 20px', color: '#64748B', fontSize: '12.5px', maxWidth: '220px' }}>
+                            {p.specs || p.packaging || 'Export Quality Grade'}
+                          </td>
+
+                          {/* Actions */}
+                          <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', gap: '8px' }}>
+                              <button 
+                                onClick={() => openEditProduct(p)} 
+                                title="Edit Product Details"
+                                style={{ 
+                                  backgroundColor: '#F1F5F9', 
+                                  border: '1.5px solid #CBD5E1', 
+                                  color: '#002147', 
+                                  padding: '8px 12px', 
+                                  borderRadius: '10px', 
+                                  cursor: 'pointer', 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  gap: '4px', 
+                                  fontWeight: 800, 
+                                  fontSize: '12.5px' 
+                                }}
+                              >
+                                <Edit3 size={14} /> Edit
+                              </button>
+                              
+                              <button 
+                                onClick={() => handleDeleteProduct(p.id, p.title)} 
+                                title="Delete Product"
+                                style={{ 
+                                  backgroundColor: '#FEF2F2', 
+                                  border: '1.5px solid #FCA5A5', 
+                                  color: '#991B1B', 
+                                  padding: '8px 12px', 
+                                  borderRadius: '10px', 
+                                  cursor: 'pointer', 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  gap: '4px', 
+                                  fontWeight: 800, 
+                                  fontSize: '12.5px' 
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {filteredProducts.length === 0 && (
+                      <tr>
+                        <td colSpan={6} style={{ padding: '60px 20px', textAlign: 'center', color: '#64748B' }}>
+                          <AlertCircle size={36} style={{ color: '#94A3B8', marginBottom: '12px' }} />
+                          <h4 style={{ fontSize: '17px', fontWeight: 800, color: '#002147', margin: '0 0 6px' }}>No Products Found</h4>
+                          <p style={{ fontSize: '13.5px', margin: 0 }}>Try clearing the search query or resetting the category filters.</p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
 
-        {/* TAB 2: BLOGS MANAGER */}
+        {/* ========================================================= */}
+        {/* TAB 2 & 3: CLIENT ENQUIRIES & QUOTE RFQS */}
+        {/* ========================================================= */}
+        {(activeTab === 'product_enquiries' || activeTab === 'contact_enquiries') && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '14px' }}>
+              <div>
+                <h3 style={{ fontSize: '22px', fontWeight: 900, color: '#002147', margin: 0, fontFamily: 'var(--font-h, Outfit, sans-serif)' }}>
+                  {activeTab === 'product_enquiries' ? 'Product Quotation RFQ Enquiries' : 'General Contact Form Inquiries'}
+                </h3>
+                <span style={{ fontSize: '13px', color: '#64748B' }}>
+                  Live incoming export requirements and buyer quotation submissions
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={exportEnquiriesCSV}
+                  style={{ backgroundColor: '#10B981', color: '#FFFFFF', border: 'none', padding: '10px 18px', borderRadius: '100px', fontWeight: 800, fontSize: '13px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Download size={15} /> Export CSV
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gap: '16px' }}>
+              {filteredEnquiries
+                .filter(e => activeTab === 'product_enquiries' ? e.type === 'product_quote' : (e.type === 'contact_form' || !e.type))
+                .map((enq, idx) => (
+                  <div 
+                    key={enq.id || idx}
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '20px',
+                      border: enq.status === 'New' ? '2px solid #38BDF8' : '1.5px solid #E2E8F0',
+                      padding: '24px',
+                      boxShadow: '0 4px 16px rgba(0,33,71,0.03)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '14px', marginBottom: '14px' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <h4 style={{ fontSize: '17px', fontWeight: 800, color: '#002147', margin: 0 }}>{enq.name || 'Anonymous Buyer'}</h4>
+                          <span style={{ 
+                            backgroundColor: enq.status === 'New' ? '#FEF2F2' : '#F0FDF4', 
+                            color: enq.status === 'New' ? '#DC2626' : '#16A34A',
+                            border: enq.status === 'New' ? '1px solid #FECACA' : '1px solid #BBF7D0',
+                            fontSize: '11.5px',
+                            fontWeight: 800,
+                            padding: '3px 10px',
+                            borderRadius: '100px'
+                          }}>
+                            {enq.status || 'New'}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '6px', fontSize: '13px', color: '#64748B', flexWrap: 'wrap' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Mail size={14} /> {enq.email || '—'}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Phone size={14} /> {enq.phone || '—'}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Globe size={14} /> {enq.country || 'Global Market'}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={14} /> {enq.timestamp ? new Date(enq.timestamp).toLocaleString() : 'Recent'}</span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => handleToggleEnquiryStatus(enq.id, enq.status)}
+                          style={{
+                            backgroundColor: enq.status === 'New' ? '#F0FDF4' : '#F8FAFC',
+                            border: enq.status === 'New' ? '1.5px solid #86EFAC' : '1px solid #CBD5E1',
+                            color: enq.status === 'New' ? '#16A34A' : '#475569',
+                            padding: '7px 14px',
+                            borderRadius: '8px',
+                            fontSize: '12.5px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Check size={14} /> {enq.status === 'New' ? 'Mark as Replied' : 'Mark as New'}
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteEnquiry(enq.id, enq.name)}
+                          style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '7px 12px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ backgroundColor: '#F8FAFC', padding: '14px 18px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                      {enq.product && (
+                        <div style={{ marginBottom: '6px' }}>
+                          <strong style={{ fontSize: '13px', color: '#002147' }}>Requested Product: </strong>
+                          <span style={{ fontSize: '13px', color: '#0284C7', fontWeight: 700 }}>{enq.product}</span>
+                          {enq.quantity && <span style={{ fontSize: '12.5px', color: '#64748B', marginLeft: '10px' }}>(Quantity: {enq.quantity})</span>}
+                        </div>
+                      )}
+                      <p style={{ fontSize: '13.5px', color: '#334155', margin: 0, lineHeight: 1.5 }}>
+                        {enq.message || enq.requirement || enq.notes || 'No specific notes provided.'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+
+              {filteredEnquiries.filter(e => activeTab === 'product_enquiries' ? e.type === 'product_quote' : (e.type === 'contact_form' || !e.type)).length === 0 && (
+                <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '60px 20px', textAlign: 'center', border: '1.5px dashed #CBD5E1' }}>
+                  <Inbox size={40} style={{ color: '#94A3B8', marginBottom: '12px' }} />
+                  <h4 style={{ fontSize: '18px', fontWeight: 800, color: '#002147', margin: '0 0 6px' }}>No Enquiries in this View</h4>
+                  <p style={{ fontSize: '13.5px', color: '#64748B', margin: 0 }}>New quote requests and contact messages from website visitors will appear here.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 4: BLOGS & ARTICLES */}
+        {/* ========================================================= */}
         {activeTab === 'blogs' && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#002147', margin: 0 }}>Articles Database</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <div>
+                <h3 style={{ fontSize: '22px', fontWeight: 900, color: '#002147', margin: 0, fontFamily: 'var(--font-h, Outfit, sans-serif)' }}>
+                  Knowledge Hub & Blog Articles
+                </h3>
+                <span style={{ fontSize: '13px', color: '#64748B' }}>Manage industry export guides, spice market insights, and technical articles</span>
+              </div>
+
               <button
                 onClick={openAddBlog}
-                style={{ backgroundColor: '#002147', color: '#FFFFFF', border: 'none', padding: '12px 24px', borderRadius: '100px', fontWeight: 800, fontSize: '14.5px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                style={{ backgroundColor: '#002147', color: '#FFFFFF', border: 'none', padding: '12px 24px', borderRadius: '100px', fontWeight: 800, fontSize: '14.5px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 14px rgba(0, 33, 71, 0.15)' }}
               >
                 <Plus size={18} />
                 <span>Add New Blog</span>
@@ -726,13 +1339,17 @@ export default function AdminPanel() {
                   <div>
                     <span style={{ fontSize: '12px', fontWeight: 800, color: '#002147', backgroundColor: '#F1F5F9', padding: '4px 12px', borderRadius: '100px' }}>{b.cat}</span>
                     <h4 style={{ fontSize: '18px', fontWeight: 800, color: '#002147', margin: '10px 0 6px' }}>{b.title}</h4>
-                    <p style={{ fontSize: '13.5px', color: '#475569', lineHeight: 1.5, margin: 0 }}>{b.excerpt}</p>
+                    <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.5, margin: 0 }}>{b.excerpt}</p>
                   </div>
-                  <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '12px', color: '#8C96A0' }}>{b.read}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', borderTop: '1px solid #F1F5F9', paddingTop: '14px' }}>
+                    <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>⏱️ {b.read}</span>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button onClick={() => openEditBlog(b)} style={{ backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', color: '#002147', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>Edit</button>
-                      <button onClick={() => handleDeleteBlog(b.id, b.title)} style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>Delete</button>
+                      <button onClick={() => openEditBlog(b)} style={{ backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', color: '#002147', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 700, fontSize: '12px' }}>
+                        <Edit3 size={13} /> Edit
+                      </button>
+                      <button onClick={() => handleDeleteBlog(b.id, b.title)} style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 700, fontSize: '12px' }}>
+                        <Trash2 size={13} /> Delete
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -741,64 +1358,46 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* TAB 3: CERTIFICATES MANAGER */}
+        {/* ========================================================= */}
+        {/* TAB 5: CERTIFICATES */}
+        {/* ========================================================= */}
         {activeTab === 'certs' && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
               <div>
-                <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#002147', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Award size={22} />
-                  <span>Official Certificates & Approvals ({certs.length})</span>
+                <h3 style={{ fontSize: '22px', fontWeight: 900, color: '#002147', margin: 0, fontFamily: 'var(--font-h, Outfit, sans-serif)' }}>
+                  Global Accreditation Badges
                 </h3>
-                <span style={{ fontSize: '13px', color: '#475569' }}>These certificate photos scroll automatically on the website's Trusted & Govt. Authorized section.</span>
+                <span style={{ fontSize: '13px', color: '#64748B' }}>Authorized certification bodies, APEDA, Spice Board, FDA, ISO credentials</span>
               </div>
+
               <button
                 onClick={openAddCert}
                 style={{ backgroundColor: '#002147', color: '#FFFFFF', border: 'none', padding: '12px 24px', borderRadius: '100px', fontWeight: 800, fontSize: '14.5px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 14px rgba(0, 33, 71, 0.15)' }}
               >
                 <Plus size={18} />
-                <span>Add Certificate Photo</span>
+                <span>Add Certificate</span>
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
               {certs.map((c, idx) => (
-                <div key={c.id || idx} style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', border: '1.5px solid #CBD5E1', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 4px 16px rgba(0,33,71,0.04)' }}>
-                  
-                  {/* Certificate Photo Display Area (Supports Vertical & Horizontal) */}
-                  <div style={{ height: '160px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '16px', padding: '12px', position: 'relative' }}>
-                    {c.logo ? (
-                      <img src={c.logo} alt={c.name} style={{ maxHeight: '100%', maxWidth: '100%', width: 'auto', height: 'auto', objectFit: 'contain' }} />
-                    ) : (
-                      <span style={{ color: '#94A3B8', fontSize: '13px', fontWeight: 600 }}>No Certificate Photo</span>
-                    )}
+                <div key={c.id || idx} style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', border: '1.5px solid #CBD5E1', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  {c.logo && (
+                    <img src={c.logo} alt={c.name} style={{ width: '56px', height: '56px', objectFit: 'contain', borderRadius: '12px', backgroundColor: '#F8FAFC', padding: '6px', border: '1px solid #E2E8F0' }} />
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: '11px', fontWeight: 800, color: '#D97706', backgroundColor: '#FEF3C7', padding: '2px 8px', borderRadius: '100px' }}>{c.code}</span>
+                    <h4 style={{ fontSize: '16px', fontWeight: 800, color: '#002147', margin: '6px 0 2px' }}>{c.name}</h4>
+                    <span style={{ fontSize: '12px', color: '#475569' }}>{c.tag}</span>
                   </div>
-
-                  <div>
-                    <h4 style={{ fontSize: '18px', fontWeight: 800, color: '#002147', marginBottom: '4px' }}>{c.name}</h4>
-                    <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>{c.tag || 'Official Authorized Certificate'}</p>
-                  </div>
-
-                  <div style={{ marginTop: 'auto', paddingTop: '14px', borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                    {/* Quick Direct Upload Photo */}
-                    <label style={{ backgroundColor: '#F0F9FF', border: '1px solid #BAE6FD', color: '#0369A1', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                      <Upload size={14} /> Upload Photo
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        style={{ display: 'none' }} 
-                        onChange={(e) => handleImageFileChange(e, (url) => {
-                          const updated = updateCertificate({ ...c, logo: url });
-                          setCertsState(updated);
-                          showNotification(`Certificate photo for "${c.name}" updated!`);
-                        })} 
-                      />
-                    </label>
-
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button onClick={() => openEditCert(c)} style={{ backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', color: '#002147', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>Edit</button>
-                      <button onClick={() => handleDeleteCert(c.id, c.name)} style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>Delete</button>
-                    </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <button onClick={() => openEditCert(c)} style={{ backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', color: '#002147', padding: '6px', borderRadius: '8px', cursor: 'pointer' }}>
+                      <Edit3 size={14} />
+                    </button>
+                    <button onClick={() => handleDeleteCert(c.id, c.name)} style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '6px', borderRadius: '8px', cursor: 'pointer' }}>
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -806,242 +1405,127 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* TAB 4: PRODUCT QUOTE ENQUIRIES */}
-        {activeTab === 'product_enquiries' && (() => {
-          const safeEnqs = Array.isArray(enquiries) ? enquiries : [];
-          const productQuotes = safeEnqs.filter(e => (e.source || '').toLowerCase().includes('product') || (e.source || '').toLowerCase().includes('quote'));
-
-          return (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+        {/* ========================================================= */}
+        {/* TAB 6: CLOUD & BACKUP HUB */}
+        {/* ========================================================= */}
+        {activeTab === 'cloud' && (
+          <div style={{ display: 'grid', gap: '24px' }}>
+            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '32px', border: '1.5px solid #E2E8F0', boxShadow: '0 8px 24px rgba(0,33,71,0.04)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: '#F0FDF4', border: '1.5px solid #BBF7D0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16A34A' }}>
+                  <Cloud size={24} />
+                </div>
                 <div>
-                  <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#0369A1', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Inbox size={22} />
-                    <span>📦 Product Quote Enquiries Inbox ({productQuotes.length})</span>
-                  </h3>
-                  <span style={{ fontSize: '13px', color: '#475569' }}>Specific RFQs submitted by buyers clicking "Request Export Quote" on products</span>
+                  <h3 style={{ fontSize: '20px', fontWeight: 900, color: '#002147', margin: 0 }}>Firebase Firestore Cloud Database</h3>
+                  <span style={{ fontSize: '13px', color: '#64748B' }}>Project ID: <strong>saheer-paradise-export</strong> (Direct Zero-Latency REST Engine)</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', margin: '24px 0' }}>
+                <div style={{ padding: '16px', borderRadius: '16px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Products Collection</span>
+                  <div style={{ fontSize: '24px', fontWeight: 900, color: '#002147', margin: '6px 0' }}>{products.length} Docs</div>
+                  <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: 700 }}>🟢 Synced Worldwide</span>
                 </div>
 
+                <div style={{ padding: '16px', borderRadius: '16px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Blogs Collection</span>
+                  <div style={{ fontSize: '24px', fontWeight: 900, color: '#002147', margin: '6px 0' }}>{blogs.length} Docs</div>
+                  <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: 700 }}>🟢 Active</span>
+                </div>
+
+                <div style={{ padding: '16px', borderRadius: '16px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Certificates Collection</span>
+                  <div style={{ fontSize: '24px', fontWeight: 900, color: '#002147', margin: '6px 0' }}>{certs.length} Docs</div>
+                  <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: 700 }}>🟢 Active</span>
+                </div>
+
+                <div style={{ padding: '16px', borderRadius: '16px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Enquiries Collection</span>
+                  <div style={{ fontSize: '24px', fontWeight: 900, color: '#002147', margin: '6px 0' }}>{enquiries.length} Docs</div>
+                  <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: 700 }}>🟢 Active</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', paddingTop: '20px', borderTop: '1px solid #F1F5F9' }}>
                 <button
-                  onClick={() => exportEnquiriesCSV('product_quote')}
+                  onClick={handlePushAllMasterToCloud}
+                  disabled={isSyncing}
                   style={{
-                    backgroundColor: '#0369A1',
+                    backgroundColor: '#002147',
                     color: '#FFFFFF',
                     border: 'none',
-                    padding: '12px 24px',
-                    borderRadius: '100px',
+                    padding: '14px 28px',
+                    borderRadius: '12px',
                     fontWeight: 800,
                     fontSize: '14px',
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 14px rgba(3, 105, 161, 0.25)'
+                    boxShadow: '0 4px 14px rgba(0, 33, 71, 0.2)'
                   }}
                 >
-                  <Download size={18} />
-                  <span>📥 Export Product Enquiries (CSV)</span>
+                  <Cloud size={18} />
+                  <span>Push All {products.length} Products to Firebase</span>
                 </button>
-              </div>
-
-              {productQuotes.length === 0 ? (
-                <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '60px 20px', textAlign: 'center', border: '1.5px solid #CBD5E1' }}>
-                  <Inbox size={48} style={{ color: '#CBD5E1', marginBottom: '16px' }} />
-                  <h4 style={{ fontSize: '18px', fontWeight: 800, color: '#002147' }}>No Product Quote Enquiries Yet</h4>
-                  <p style={{ color: '#475569', fontSize: '14px' }}>Product quote requests submitted by website buyers will appear here in real time.</p>
-                </div>
-              ) : (
-                <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', border: '1.5px solid #CBD5E1', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,33,71,0.04)' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#F0F9FF', borderBottom: '1.5px solid #BAE6FD', color: '#0369A1', fontWeight: 800 }}>
-                        <th style={{ padding: '16px 20px' }}>Date</th>
-                        <th style={{ padding: '16px 20px' }}>Buyer & Company</th>
-                        <th style={{ padding: '16px 20px' }}>Requested Commodity</th>
-                        <th style={{ padding: '16px 20px' }}>Target Quantity</th>
-                        <th style={{ padding: '16px 20px' }}>Destination Port</th>
-                        <th style={{ padding: '16px 20px' }}>Status</th>
-                        <th style={{ padding: '16px 20px', textAlign: 'right' }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {productQuotes.map((enq) => (
-                        <tr key={enq.id} style={{ borderBottom: '1px solid #E2E8F0', backgroundColor: enq.status === 'New' ? 'rgba(3, 105, 161, 0.03)' : '#FFFFFF' }}>
-                          <td style={{ padding: '16px 20px', fontSize: '13px', color: '#475569', fontWeight: 600 }}>
-                            {enq.date}
-                          </td>
-                          <td style={{ padding: '16px 20px' }}>
-                            <strong style={{ fontSize: '15px', color: '#002147', display: 'block' }}>{enq.name}</strong>
-                            <span style={{ fontSize: '12.5px', color: '#475569' }}>{enq.company}</span>
-                          </td>
-                          <td style={{ padding: '16px 20px' }}>
-                            <strong style={{ color: '#0369A1', fontSize: '14.5px', display: 'block' }}>{enq.product}</strong>
-                          </td>
-                          <td style={{ padding: '16px 20px', color: '#002147', fontWeight: 700 }}>
-                            {enq.quantity}
-                          </td>
-                          <td style={{ padding: '16px 20px', color: '#002147', fontWeight: 600 }}>
-                            {enq.destinationPort || 'Not specified'}
-                          </td>
-                          <td style={{ padding: '16px 20px' }}>
-                            <span style={{
-                              padding: '4px 12px',
-                              borderRadius: '100px',
-                              fontSize: '12px',
-                              fontWeight: 800,
-                              backgroundColor: enq.status === 'New' ? '#FEF3C7' : '#D1FAE5',
-                              color: enq.status === 'New' ? '#92400E' : '#065F46',
-                              border: enq.status === 'New' ? '1px solid #FCD34D' : '1px solid #6EE7B7'
-                            }}>
-                              {enq.status || 'New'}
-                            </span>
-                          </td>
-                          <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                            <div style={{ display: 'inline-flex', gap: '8px' }}>
-                              <button onClick={() => setSelectedEnquiry(enq)} style={{ backgroundColor: '#0369A1', color: '#FFFFFF', border: 'none', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>
-                                View Details
-                              </button>
-                              <button onClick={() => handleToggleEnquiryStatus(enq.id, enq.status)} style={{ backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', color: '#002147', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>
-                                {enq.status === 'New' ? 'Mark Replied' : 'Mark New'}
-                              </button>
-                              <button onClick={() => handleDeleteEnquiry(enq.id, enq.name)} style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {/* TAB 5: CONTACT US ENQUIRIES */}
-        {activeTab === 'contact_enquiries' && (() => {
-          const safeEnqs = Array.isArray(enquiries) ? enquiries : [];
-          const contactFormEnqs = safeEnqs.filter(e => (e.source || '').toLowerCase().includes('contact'));
-
-          return (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-                <div>
-                  <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#15803D', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Mail size={22} />
-                    <span>✉️ Contact Us Form Submissions Inbox ({contactFormEnqs.length})</span>
-                  </h3>
-                  <span style={{ fontSize: '13px', color: '#475569' }}>General export enquiries submitted through the website Contact Us page form</span>
-                </div>
 
                 <button
-                  onClick={() => exportEnquiriesCSV('contact_form')}
+                  onClick={handleReloadCloud}
+                  disabled={isSyncing}
                   style={{
-                    backgroundColor: '#15803D',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    padding: '12px 24px',
-                    borderRadius: '100px',
+                    backgroundColor: '#F8FAFC',
+                    border: '1.5px solid #CBD5E1',
+                    color: '#002147',
+                    padding: '14px 24px',
+                    borderRadius: '12px',
                     fontWeight: 800,
                     fontSize: '14px',
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: '0 4px 14px rgba(21, 128, 61, 0.25)'
+                    gap: '8px'
                   }}
                 >
-                  <Download size={18} />
-                  <span>📥 Export Contact Enquiries (CSV)</span>
+                  <RefreshCw size={16} className={isSyncing ? 'spin' : ''} />
+                  <span>Force Re-fetch from Firebase</span>
+                </button>
+
+                <button
+                  onClick={handleExportFullBackup}
+                  style={{
+                    backgroundColor: '#F0FDF4',
+                    border: '1.5px solid #86EFAC',
+                    color: '#15803D',
+                    padding: '14px 24px',
+                    borderRadius: '12px',
+                    fontWeight: 800,
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <Download size={16} />
+                  <span>Download Full JSON Backup</span>
                 </button>
               </div>
-
-              {contactFormEnqs.length === 0 ? (
-                <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '60px 20px', textAlign: 'center', border: '1.5px solid #CBD5E1' }}>
-                  <Mail size={48} style={{ color: '#CBD5E1', marginBottom: '16px' }} />
-                  <h4 style={{ fontSize: '18px', fontWeight: 800, color: '#002147' }}>No Contact Form Submissions Yet</h4>
-                  <p style={{ color: '#475569', fontSize: '14px' }}>Submissions from the Contact Us page will appear here in real time.</p>
-                </div>
-              ) : (
-                <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', border: '1.5px solid #CBD5E1', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,33,71,0.04)' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#F0FDF4', borderBottom: '1.5px solid #BBF7D0', color: '#15803D', fontWeight: 800 }}>
-                        <th style={{ padding: '16px 20px' }}>Date</th>
-                        <th style={{ padding: '16px 20px' }}>Sender Name & Company</th>
-                        <th style={{ padding: '16px 20px' }}>Email & Phone</th>
-                        <th style={{ padding: '16px 20px' }}>Product Interest</th>
-                        <th style={{ padding: '16px 20px' }}>Message / Enquiry</th>
-                        <th style={{ padding: '16px 20px' }}>Status</th>
-                        <th style={{ padding: '16px 20px', textAlign: 'right' }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {contactFormEnqs.map((enq) => (
-                        <tr key={enq.id} style={{ borderBottom: '1px solid #E2E8F0', backgroundColor: enq.status === 'New' ? 'rgba(21, 128, 61, 0.03)' : '#FFFFFF' }}>
-                          <td style={{ padding: '16px 20px', fontSize: '13px', color: '#475569', fontWeight: 600 }}>
-                            {enq.date}
-                          </td>
-                          <td style={{ padding: '16px 20px' }}>
-                            <strong style={{ fontSize: '15px', color: '#002147', display: 'block' }}>{enq.name}</strong>
-                            <span style={{ fontSize: '12.5px', color: '#475569' }}>{enq.company || 'Individual Importer'}</span>
-                          </td>
-                          <td style={{ padding: '16px 20px' }}>
-                            <a href={`mailto:${enq.email}`} style={{ color: '#002147', fontWeight: 700, display: 'block', textDecoration: 'none', fontSize: '13.5px' }}>{enq.email}</a>
-                            <span style={{ fontSize: '12.5px', color: '#475569' }}>{enq.phone}</span>
-                          </td>
-                          <td style={{ padding: '16px 20px', color: '#15803D', fontWeight: 700 }}>
-                            {enq.product}
-                          </td>
-                          <td style={{ padding: '16px 20px', color: '#475569', fontSize: '13px', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {enq.notes || enq.message || 'No message attached'}
-                          </td>
-                          <td style={{ padding: '16px 20px' }}>
-                            <span style={{
-                              padding: '4px 12px',
-                              borderRadius: '100px',
-                              fontSize: '12px',
-                              fontWeight: 800,
-                              backgroundColor: enq.status === 'New' ? '#FEF3C7' : '#D1FAE5',
-                              color: enq.status === 'New' ? '#92400E' : '#065F46',
-                              border: enq.status === 'New' ? '1px solid #FCD34D' : '1px solid #6EE7B7'
-                            }}>
-                              {enq.status || 'New'}
-                            </span>
-                          </td>
-                          <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                            <div style={{ display: 'inline-flex', gap: '8px' }}>
-                              <button onClick={() => setSelectedEnquiry(enq)} style={{ backgroundColor: '#15803D', color: '#FFFFFF', border: 'none', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>
-                                View Details
-                              </button>
-                              <button onClick={() => handleToggleEnquiryStatus(enq.id, enq.status)} style={{ backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', color: '#002147', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>
-                                {enq.status === 'New' ? 'Mark Replied' : 'Mark New'}
-                              </button>
-                              <button onClick={() => handleDeleteEnquiry(enq.id, enq.name)} style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
             </div>
-          );
-        })()}
+          </div>
+        )}
 
       </div>
 
-      {/* --- MODAL 1: ADD / EDIT PRODUCT --- */}
+      {/* ========================================================= */}
+      {/* MODAL 1: ADD / EDIT PRODUCT */}
+      {/* ========================================================= */}
       {showProductModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(7,23,44,0.75)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(4px)' }}>
           <div style={{ backgroundColor: '#FFFFFF', borderRadius: '28px', padding: '32px', width: '100%', maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto', border: '1.5px solid #CBD5E1', boxShadow: '0 24px 60px rgba(0,0,0,0.3)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', borderBottom: '1.5px solid #F1F5F9', paddingBottom: '16px' }}>
               <h3 style={{ fontSize: '22px', fontWeight: 900, color: '#002147', margin: 0, fontFamily: 'var(--font-h, Outfit, sans-serif)' }}>
-                {editingProduct ? 'Edit Product Details' : 'Add New Agro Product'}
+                {editingProduct ? 'Edit Product Details' : 'Add New Export Product'}
               </h3>
               <button onClick={() => setShowProductModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}>
                 <X size={24} />
@@ -1118,7 +1602,7 @@ export default function AdminPanel() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Product Image (URL or Upload)</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Product Image (URL or Upload File)</label>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <input
                     type="text"
@@ -1127,13 +1611,16 @@ export default function AdminPanel() {
                     onChange={(e) => setProdForm({ ...prodForm, image: e.target.value })}
                     style={{ flex: 1, padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px' }}
                   />
-                  <label style={{ backgroundColor: '#F1F5F9', border: '1.5px solid #CBD5E1', padding: '10px 16px', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '13px', color: '#002147', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <label style={{ backgroundColor: '#F1F5F9', border: '1.5px solid #CBD5E1', padding: '10px 16px', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '13px', color: '#002147', display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
                     <Upload size={15} /> Upload File
                     <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleImageFileChange(e, (url) => setProdForm({ ...prodForm, image: url }))} />
                   </label>
                 </div>
                 {prodForm.image && (
-                  <img src={prodForm.image} alt="Preview" style={{ height: '60px', marginTop: '10px', borderRadius: '10px', objectFit: 'contain', border: '1px solid #CBD5E1' }} />
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <img src={prodForm.image} alt="Preview" style={{ height: '60px', width: '60px', borderRadius: '10px', objectFit: 'contain', border: '1px solid #CBD5E1', backgroundColor: '#F8FAFC' }} />
+                    <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: 700 }}>✓ Image preview active</span>
+                  </div>
                 )}
               </div>
 
@@ -1149,32 +1636,69 @@ export default function AdminPanel() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Description</label>
-                <textarea
-                  rows={3}
-                  placeholder="Detailed product description for global export buyers..."
-                  value={prodForm.description}
-                  onChange={(e) => setProdForm({ ...prodForm, description: e.target.value })}
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Packaging Details</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 25kg / 50kg PP Bags / Custom Vacuum"
+                  value={prodForm.packaging}
+                  onChange={(e) => setProdForm({ ...prodForm, packaging: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
-                <button type="button" onClick={() => setShowProductModal(false)} style={{ padding: '12px 24px', borderRadius: '100px', border: '1.5px solid #CBD5E1', backgroundColor: 'transparent', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ padding: '12px 32px', borderRadius: '100px', backgroundColor: '#002147', color: '#FFFFFF', border: 'none', fontWeight: 800, cursor: 'pointer' }}>Save Product</button>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Description</label>
+                <textarea
+                  rows={3}
+                  placeholder="Full export product description..."
+                  value={prodForm.description}
+                  onChange={(e) => setProdForm({ ...prodForm, description: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', resize: 'vertical', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="checkbox"
+                  id="prod-featured"
+                  checked={prodForm.isFeatured}
+                  onChange={(e) => setProdForm({ ...prodForm, isFeatured: e.target.checked })}
+                  style={{ width: '16px', height: '16px' }}
+                />
+                <label htmlFor="prod-featured" style={{ fontSize: '13px', fontWeight: 700, color: '#002147', cursor: 'pointer' }}>
+                  Feature this product on Homepage
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px', borderTop: '1.5px solid #F1F5F9', paddingTop: '16px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowProductModal(false)}
+                  style={{ backgroundColor: '#F1F5F9', border: 'none', padding: '10px 20px', borderRadius: '10px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', color: '#475569' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ backgroundColor: '#002147', border: 'none', padding: '10px 24px', borderRadius: '10px', fontWeight: 800, fontSize: '14px', cursor: 'pointer', color: '#FFFFFF', boxShadow: '0 4px 12px rgba(0, 33, 71, 0.2)' }}
+                >
+                  {editingProduct ? 'Save Changes' : 'Create Product'}
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* --- MODAL 2: ADD / EDIT BLOG --- */}
+      {/* ========================================================= */}
+      {/* MODAL 2: ADD / EDIT BLOG */}
+      {/* ========================================================= */}
       {showBlogModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(7,23,44,0.75)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(4px)' }}>
           <div style={{ backgroundColor: '#FFFFFF', borderRadius: '28px', padding: '32px', width: '100%', maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto', border: '1.5px solid #CBD5E1', boxShadow: '0 24px 60px rgba(0,0,0,0.3)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', borderBottom: '1.5px solid #F1F5F9', paddingBottom: '16px' }}>
               <h3 style={{ fontSize: '22px', fontWeight: 900, color: '#002147', margin: 0, fontFamily: 'var(--font-h, Outfit, sans-serif)' }}>
-                {editingBlog ? 'Edit Blog Article' : 'Publish New Blog'}
+                {editingBlog ? 'Edit Blog Article' : 'Publish New Blog Article'}
               </h3>
               <button onClick={() => setShowBlogModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}>
                 <X size={24} />
@@ -1187,7 +1711,7 @@ export default function AdminPanel() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Sourcing High-Curcumin Indian Turmeric"
+                  placeholder="e.g. Navigating Indian Spice Export Standards"
                   value={blogForm.title}
                   onChange={(e) => setBlogForm({ ...blogForm, title: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
@@ -1196,10 +1720,10 @@ export default function AdminPanel() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Category</label>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Category Tag</label>
                   <input
                     type="text"
-                    placeholder="e.g. Product Guide"
+                    placeholder="e.g. Export Guide"
                     value={blogForm.cat}
                     onChange={(e) => setBlogForm({ ...blogForm, cat: e.target.value })}
                     style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
@@ -1218,60 +1742,67 @@ export default function AdminPanel() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Cover Image (URL or Upload)</label>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    placeholder="Paste Image URL or select file"
-                    value={blogForm.image}
-                    onChange={(e) => setBlogForm({ ...blogForm, image: e.target.value })}
-                    style={{ flex: 1, padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px' }}
-                  />
-                  <label style={{ backgroundColor: '#F1F5F9', border: '1.5px solid #CBD5E1', padding: '10px 16px', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '13px', color: '#002147', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <Upload size={15} /> Upload
-                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleImageFileChange(e, (url) => setBlogForm({ ...blogForm, image: url }))} />
-                  </label>
-                </div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Cover Image URL</label>
+                <input
+                  type="text"
+                  placeholder="https://images.unsplash.com/..."
+                  value={blogForm.image}
+                  onChange={(e) => setBlogForm({ ...blogForm, image: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
+                />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Excerpt (Short Summary)</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Short Summary / Excerpt</label>
                 <textarea
                   rows={2}
-                  placeholder="Short brief of article for blog card preview..."
+                  placeholder="Brief 1-2 sentence preview for cards..."
                   value={blogForm.excerpt}
                   onChange={(e) => setBlogForm({ ...blogForm, excerpt: e.target.value })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', resize: 'vertical', boxSizing: 'border-box' }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Full Article Body</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Article Content</label>
                 <textarea
-                  rows={6}
-                  placeholder="Complete article content..."
+                  rows={5}
+                  placeholder="Full article body content..."
                   value={blogForm.body}
                   onChange={(e) => setBlogForm({ ...blogForm, body: e.target.value })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', resize: 'vertical', boxSizing: 'border-box' }}
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
-                <button type="button" onClick={() => setShowBlogModal(false)} style={{ padding: '12px 24px', borderRadius: '100px', border: '1.5px solid #CBD5E1', backgroundColor: 'transparent', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ padding: '12px 32px', borderRadius: '100px', backgroundColor: '#002147', color: '#FFFFFF', border: 'none', fontWeight: 800, cursor: 'pointer' }}>Save Article</button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px', borderTop: '1.5px solid #F1F5F9', paddingTop: '16px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowBlogModal(false)}
+                  style={{ backgroundColor: '#F1F5F9', border: 'none', padding: '10px 20px', borderRadius: '10px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', color: '#475569' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ backgroundColor: '#002147', border: 'none', padding: '10px 24px', borderRadius: '10px', fontWeight: 800, fontSize: '14px', cursor: 'pointer', color: '#FFFFFF', boxShadow: '0 4px 12px rgba(0, 33, 71, 0.2)' }}
+                >
+                  {editingBlog ? 'Save Article' : 'Publish Article'}
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* --- MODAL 3: ADD / EDIT CERTIFICATE --- */}
+      {/* ========================================================= */}
+      {/* MODAL 3: ADD / EDIT CERTIFICATE */}
+      {/* ========================================================= */}
       {showCertModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(7,23,44,0.75)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(4px)' }}>
-          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '28px', padding: '32px', width: '100%', maxWidth: '540px', border: '1.5px solid #CBD5E1', boxShadow: '0 24px 60px rgba(0,0,0,0.3)' }}>
+          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '28px', padding: '32px', width: '100%', maxWidth: '540px', maxHeight: '90vh', overflowY: 'auto', border: '1.5px solid #CBD5E1', boxShadow: '0 24px 60px rgba(0,0,0,0.3)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', borderBottom: '1.5px solid #F1F5F9', paddingBottom: '16px' }}>
               <h3 style={{ fontSize: '22px', fontWeight: 900, color: '#002147', margin: 0, fontFamily: 'var(--font-h, Outfit, sans-serif)' }}>
-                {editingCert ? 'Edit Certificate' : 'Add New Certificate'}
+                {editingCert ? 'Edit Certificate' : 'Add New Accreditation'}
               </h3>
               <button onClick={() => setShowCertModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}>
                 <X size={24} />
@@ -1280,11 +1811,11 @@ export default function AdminPanel() {
 
             <form onSubmit={handleSaveCert} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Certificate Name / Authority *</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Certificate Name *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. APEDA Certified Exporter, US FDA, Spices Board..."
+                  placeholder="e.g. APEDA Certified Exporter"
                   value={certForm.name}
                   onChange={(e) => setCertForm({ ...certForm, name: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
@@ -1292,7 +1823,18 @@ export default function AdminPanel() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Short Description / Details</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Short Badge Code</label>
+                <input
+                  type="text"
+                  placeholder="e.g. APEDA / GOVT"
+                  value={certForm.code}
+                  onChange={(e) => setCertForm({ ...certForm, code: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Authority Description Tag</label>
                 <input
                   type="text"
                   placeholder="e.g. Ministry of Commerce & Industry, Govt of India"
@@ -1303,148 +1845,52 @@ export default function AdminPanel() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Certificate Photo / Logo *</label>
-                
-                {/* Visual Photo Upload Dropzone */}
-                <div style={{ border: '2px dashed #CBD5E1', borderRadius: '16px', padding: '20px', textAlign: 'center', background: '#F8FAFC', position: 'relative' }}>
-                  {certForm.logo ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ height: '90px', width: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FFFFFF', border: '1.5px solid #E2E8F0', borderRadius: '14px', padding: '8px' }}>
-                        <img src={certForm.logo} alt="Preview" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
-                      </div>
-                      <label style={{ backgroundColor: '#002147', color: '#FFFFFF', padding: '8px 18px', borderRadius: '100px', cursor: 'pointer', fontWeight: 700, fontSize: '12.5px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                        <Upload size={14} /> Change Photo
-                        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleImageFileChange(e, (url) => setCertForm({ ...certForm, logo: url }))} />
-                      </label>
-                    </div>
-                  ) : (
-                    <div>
-                      <Upload size={32} style={{ color: '#94A3B8', marginBottom: '8px' }} />
-                      <p style={{ margin: '0 0 10px', fontSize: '13.5px', color: '#475569', fontWeight: 600 }}>Upload Certificate Image (PNG, JPG, SVG, WebP)</p>
-                      <label style={{ backgroundColor: '#002147', color: '#FFFFFF', padding: '9px 22px', borderRadius: '100px', cursor: 'pointer', fontWeight: 800, fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                        <Upload size={15} /> Select Certificate Photo
-                        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleImageFileChange(e, (url) => setCertForm({ ...certForm, logo: url }))} />
-                      </label>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ marginTop: '10px' }}>
-                  <input
-                    type="text"
-                    placeholder="Or paste external image URL..."
-                    value={certForm.logo}
-                    onChange={(e) => setCertForm({ ...certForm, logo: e.target.value })}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px', boxSizing: 'border-box' }}
-                  />
-                </div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Logo Image URL / Upload</label>
+                <input
+                  type="text"
+                  placeholder="Image URL or upload"
+                  value={certForm.logo}
+                  onChange={(e) => setCertForm({ ...certForm, logo: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
+                />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
-                <button type="button" onClick={() => setShowCertModal(false)} style={{ padding: '12px 24px', borderRadius: '100px', border: '1.5px solid #CBD5E1', backgroundColor: 'transparent', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ padding: '12px 32px', borderRadius: '100px', backgroundColor: '#002147', color: '#FFFFFF', border: 'none', fontWeight: 800, cursor: 'pointer' }}>Save Certificate</button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px', borderTop: '1.5px solid #F1F5F9', paddingTop: '16px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCertModal(false)}
+                  style={{ backgroundColor: '#F1F5F9', border: 'none', padding: '10px 20px', borderRadius: '10px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', color: '#475569' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ backgroundColor: '#002147', border: 'none', padding: '10px 24px', borderRadius: '10px', fontWeight: 800, fontSize: '14px', cursor: 'pointer', color: '#FFFFFF' }}
+                >
+                  {editingCert ? 'Save Certificate' : 'Add Certificate'}
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* --- MODAL 4: VIEW ENQUIRY DETAILS --- */}
-      {selectedEnquiry && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(7,23,44,0.75)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(4px)' }}>
-          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '28px', padding: '32px', width: '100%', maxWidth: '600px', border: '1.5px solid #CBD5E1', boxShadow: '0 24px 60px rgba(0,0,0,0.3)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', borderBottom: '1.5px solid #F1F5F9', paddingBottom: '16px' }}>
-              <div>
-                <span style={{ fontSize: '11px', fontWeight: 800, color: '#0369A1', backgroundColor: '#E0F2FE', padding: '3px 8px', borderRadius: '6px', marginRight: '8px', border: '1px solid #BAE6FD' }}>
-                  {selectedEnquiry.source || 'Website Form'}
-                </span>
-                <span style={{ fontSize: '12px', fontWeight: 800, color: '#8C96A0' }}>{selectedEnquiry.date}</span>
-                <h3 style={{ fontSize: '22px', fontWeight: 900, color: '#002147', margin: '4px 0 0', fontFamily: 'var(--font-h, Outfit, sans-serif)' }}>
-                  Enquiry & Quote Details
-                </h3>
-              </div>
-              <button onClick={() => setSelectedEnquiry(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}>
-                <X size={24} />
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '14px' }}>
-              <div style={{ backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '16px', border: '1px solid #E2E8F0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <span style={{ fontSize: '12px', color: '#475569', display: 'block', fontWeight: 700 }}>BUYER NAME</span>
-                  <strong style={{ fontSize: '15px', color: '#002147' }}>{selectedEnquiry.name}</strong>
-                </div>
-                <div>
-                  <span style={{ fontSize: '12px', color: '#475569', display: 'block', fontWeight: 700 }}>COMPANY</span>
-                  <strong style={{ fontSize: '15px', color: '#002147' }}>{selectedEnquiry.company}</strong>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#F1F5F9', padding: '12px 16px', borderRadius: '12px' }}>
-                  <Mail size={18} style={{ color: '#002147' }} />
-                  <div>
-                    <span style={{ fontSize: '11px', color: '#475569', display: 'block' }}>Email Address</span>
-                    <a href={`mailto:${selectedEnquiry.email}`} style={{ color: '#002147', fontWeight: 700, textDecoration: 'none' }}>{selectedEnquiry.email}</a>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#F1F5F9', padding: '12px 16px', borderRadius: '12px' }}>
-                  <Phone size={18} style={{ color: '#25D366' }} />
-                  <div>
-                    <span style={{ fontSize: '11px', color: '#475569', display: 'block' }}>Phone / WhatsApp</span>
-                    <a href={`https://api.whatsapp.com/send?phone=${selectedEnquiry.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" style={{ color: '#002147', fontWeight: 700, textDecoration: 'none' }}>{selectedEnquiry.phone}</a>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '16px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div>
-                  <span style={{ fontSize: '12px', color: '#475569', fontWeight: 700 }}>REQUESTED PRODUCT</span>
-                  <p style={{ margin: '2px 0 0', fontWeight: 800, color: '#002147', fontSize: '16px' }}>{selectedEnquiry.product}</p>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}>
-                  <div>
-                    <span style={{ fontSize: '12px', color: '#475569', fontWeight: 700 }}>TARGET QUANTITY</span>
-                    <p style={{ margin: 0, fontWeight: 700, color: '#002147' }}>{selectedEnquiry.quantity}</p>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '12px', color: '#475569', fontWeight: 700 }}>DESTINATION PORT</span>
-                    <p style={{ margin: 0, fontWeight: 700, color: '#002147' }}>{selectedEnquiry.destinationPort || 'Not specified'}</p>
-                  </div>
-                </div>
-              </div>
-
-              {selectedEnquiry.notes && (
-                <div>
-                  <span style={{ fontSize: '12px', color: '#475569', fontWeight: 700, display: 'block', marginBottom: '4px' }}>BUYER NOTES / MESSAGE</span>
-                  <div style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', padding: '14px', borderRadius: '12px', color: '#92400E', lineHeight: 1.5, fontSize: '13.5px' }}>
-                    {selectedEnquiry.notes}
-                  </div>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '16px', borderTop: '1px solid #E2E8F0' }}>
-                <button
-                  onClick={() => {
-                    handleToggleEnquiryStatus(selectedEnquiry.id, selectedEnquiry.status);
-                    setSelectedEnquiry(prev => ({ ...prev, status: prev.status === 'New' ? 'Replied' : 'New' }));
-                  }}
-                  style={{ backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', padding: '10px 18px', borderRadius: '100px', fontWeight: 700, color: '#002147', cursor: 'pointer' }}
-                >
-                  Status: {selectedEnquiry.status} (Toggle)
-                </button>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <a
-                    href={`https://api.whatsapp.com/send?phone=${selectedEnquiry.phone.replace(/[^0-9]/g, '')}&text=Hi%20${encodeURIComponent(selectedEnquiry.name)},%20thank%20you%20for%20your%20quote%20request%20for%20${encodeURIComponent(selectedEnquiry.product)}%20at%20Saheer%20Paradise%20Export.`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ backgroundColor: '#25D366', color: '#FFFFFF', padding: '10px 20px', borderRadius: '100px', fontWeight: 800, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13.5px' }}
-                  >
-                    <MessageSquare size={16} /> Reply on WhatsApp
-                  </a>
-                </div>
-              </div>
-            </div>
+      {/* ========================================================= */}
+      {/* MODAL 4: IMAGE FULL PREVIEW */}
+      {/* ========================================================= */}
+      {previewImage && (
+        <div 
+          onClick={() => setPreviewImage(null)}
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(6px)', cursor: 'zoom-out' }}
+        >
+          <div style={{ position: 'relative', maxWidth: '800px', maxHeight: '85vh', backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '16px', overflow: 'hidden' }}>
+            <button 
+              onClick={() => setPreviewImage(null)}
+              style={{ position: 'absolute', top: '24px', right: '24px', backgroundColor: '#002147', color: '#FFFFFF', border: 'none', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <X size={18} />
+            </button>
+            <img src={previewImage} alt="Full Preview" style={{ width: '100%', height: 'auto', maxHeight: '75vh', objectFit: 'contain', borderRadius: '16px' }} />
           </div>
         </div>
       )}
