@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Menu, X, ArrowRight, MapPin, Mail, Phone, ChevronDown, 
-  Flame, Wheat, Cog, Cylinder, LayoutGrid, ChevronRight, Sparkles 
+  Flame, Wheat, Cog, Cylinder, ChevronRight 
 } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
@@ -9,46 +9,30 @@ const CATEGORIES_MENU = [
   {
     id: 'category-indian-spices',
     categoryKey: 'Indian Spices',
-    number: '01',
     title: 'Indian Spices',
-    subtitle: 'Pure Ground, Whole, Seed, Blended & Exotic Spices',
     icon: Flame,
-    color: '#D97706',
-    bg: '#FEF3C7',
-    badge: '38+ Products'
+    color: '#EA580C'
   },
   {
     id: 'category-agro-commodities',
     categoryKey: 'Agro Commodities',
-    number: '02',
     title: 'Agro Commodities',
-    subtitle: '1121 Basmati Rice, Wheat, Soybeans, Peanuts & Pulses',
     icon: Wheat,
-    color: '#059669',
-    bg: '#D1FAE5',
-    badge: 'Export Grade'
+    color: '#16A34A'
   },
   {
     id: 'category-machinery',
     categoryKey: 'Machinery',
-    number: '03',
     title: 'Machinery',
-    subtitle: 'AI Color Sorters, Spice Pulverizers & Packaging Units',
     icon: Cog,
-    color: '#2563EB',
-    bg: '#DBEAFE',
-    badge: 'Industrial'
+    color: '#0284C7'
   },
   {
     id: 'category-pipes',
     categoryKey: 'Pipes',
-    number: '04',
     title: 'Pipes',
-    subtitle: 'Stainless Steel, Carbon Steel, HDPE & PVC Pipeline Solutions',
     icon: Cylinder,
-    color: '#4F46E5',
-    bg: '#E0E7FF',
-    badge: 'ASTM / ISO'
+    color: '#6366F1'
   }
 ];
 
@@ -99,7 +83,7 @@ export default function Navbar({ activePage, onNavigate }) {
   const handleMouseLeave = () => {
     dropdownTimeoutRef.current = setTimeout(() => {
       setDropdownOpen(false);
-    }, 200);
+    }, 180);
   };
 
   useEffect(() => {
@@ -155,9 +139,9 @@ export default function Navbar({ activePage, onNavigate }) {
                 About Us
               </a>
 
-              {/* Product Categories Dropdown */}
+              {/* Product Categories Clean Dropdown */}
               <div 
-                className="nav-dropdown-wrapper"
+                style={{ position: 'relative' }}
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
               >
@@ -176,7 +160,7 @@ export default function Navbar({ activePage, onNavigate }) {
                     fontWeight: 700,
                     fontSize: '17px',
                     color: isCategoryActive ? 'var(--gold)' : 'var(--navy)',
-                    padding: '12px 0',
+                    padding: '16px 0',
                     transition: 'color 0.2s'
                   }}
                   aria-expanded={dropdownOpen}
@@ -192,33 +176,27 @@ export default function Navbar({ activePage, onNavigate }) {
                   />
                 </button>
 
-                {/* Dropdown Popup */}
-                <div 
-                  className="nav-dropdown-menu"
-                  style={{
-                    width: '480px',
-                    minWidth: '480px',
-                    maxWidth: '90vw',
-                    boxSizing: 'border-box',
-                    display: dropdownOpen ? 'block' : undefined,
-                    opacity: dropdownOpen ? 1 : undefined,
-                    visibility: dropdownOpen ? 'visible' : undefined,
-                    transform: dropdownOpen ? 'translateX(-50%) translateY(0) scale(1)' : undefined,
-                    pointerEvents: dropdownOpen ? 'auto' : undefined
-                  }}
-                >
-                  {/* Dropdown Top Bar */}
-                  <div style={{ padding: '8px 14px 10px', borderBottom: '1px solid #F1F5F9', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '11.5px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--gold-deep)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Sparkles size={13} /> Export Product Verticals
-                    </span>
-                    <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748B', backgroundColor: '#F1F5F9', padding: '2px 8px', borderRadius: '100px' }}>
-                      4 Categories
-                    </span>
-                  </div>
-
-                  {/* Category Items (1st Indian Spices, 2nd Agro Commodities, 3rd Machinery, 4th Pipes) */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {/* Simple, Clean & Minimal Dropdown Menu */}
+                {dropdownOpen && (
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: '230px',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '14px',
+                      border: '1.5px solid #E2E8F0',
+                      boxShadow: '0 14px 34px rgba(0, 33, 71, 0.12)',
+                      padding: '6px',
+                      boxSizing: 'border-box',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '3px',
+                      zIndex: 10000
+                    }}
+                  >
                     {CATEGORIES_MENU.map((item) => {
                       const Icon = item.icon;
                       const isCurrentActive = activePage === item.id;
@@ -233,109 +211,32 @@ export default function Navbar({ activePage, onNavigate }) {
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '14px',
-                            padding: '12px 14px',
-                            borderRadius: '14px',
+                            gap: '10px',
+                            padding: '10px 14px',
+                            borderRadius: '10px',
                             textDecoration: 'none',
-                            color: 'var(--navy)',
-                            transition: 'all 0.2s ease',
-                            backgroundColor: isCurrentActive ? '#FFFBEB' : '#FFFFFF',
-                            border: isCurrentActive ? '1.5px solid var(--gold)' : '1px solid #F1F5F9',
-                            boxShadow: isCurrentActive ? '0 2px 10px rgba(200, 148, 10, 0.12)' : 'none'
+                            color: isCurrentActive ? '#002147' : '#334155',
+                            backgroundColor: isCurrentActive ? '#F1F5F9' : 'transparent',
+                            fontWeight: isCurrentActive ? 800 : 600,
+                            fontSize: '14.5px',
+                            transition: 'all 0.15s ease'
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.backgroundColor = '#F8FAFC';
-                            e.currentTarget.style.borderColor = '#CBD5E1';
-                            e.currentTarget.style.transform = 'translateX(4px)';
+                            e.currentTarget.style.color = item.color;
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = isCurrentActive ? '#FFFBEB' : '#FFFFFF';
-                            e.currentTarget.style.borderColor = isCurrentActive ? 'var(--gold)' : '#F1F5F9';
-                            e.currentTarget.style.transform = 'translateX(0)';
+                            e.currentTarget.style.backgroundColor = isCurrentActive ? '#F1F5F9' : 'transparent';
+                            e.currentTarget.style.color = isCurrentActive ? '#002147' : '#334155';
                           }}
                         >
-                          <div style={{
-                            width: '46px',
-                            height: '46px',
-                            minWidth: '46px',
-                            borderRadius: '12px',
-                            backgroundColor: item.bg,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                            color: item.color,
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                          }}>
-                            <Icon size={24} />
-                          </div>
-
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
-                              <span style={{ fontSize: '15.5px', fontWeight: 800, color: 'var(--navy)' }}>
-                                {item.title}
-                              </span>
-                              <span style={{ 
-                                fontSize: '11px', 
-                                fontWeight: 800, 
-                                color: item.color, 
-                                backgroundColor: item.bg, 
-                                padding: '2px 8px', 
-                                borderRadius: '6px',
-                                border: `1px solid ${item.color}30`
-                              }}>
-                                {item.number}
-                              </span>
-                            </div>
-                            <p style={{ fontSize: '12.5px', color: '#64748B', margin: 0, fontWeight: 500, lineHeight: 1.35 }}>
-                              {item.subtitle}
-                            </p>
-                          </div>
-
-                          <ChevronRight size={18} style={{ color: '#94A3B8', flexShrink: 0, marginLeft: '4px' }} />
+                          <Icon size={17} style={{ color: item.color, flexShrink: 0 }} />
+                          <span style={{ flex: 1 }}>{item.title}</span>
                         </a>
                       );
                     })}
                   </div>
-
-                  {/* Dropdown Footer CTA */}
-                  <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #F1F5F9' }}>
-                    <a
-                      href="#all-products"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleNav('products', 'All');
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        padding: '11px',
-                        borderRadius: '12px',
-                        backgroundColor: '#FFFDF7',
-                        border: '1.5px dashed var(--gold)',
-                        color: 'var(--gold-deep)',
-                        fontSize: '13.5px',
-                        fontWeight: 800,
-                        textDecoration: 'none',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--gold)';
-                        e.currentTarget.style.color = '#1C1917';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#FFFDF7';
-                        e.currentTarget.style.color = 'var(--gold-deep)';
-                      }}
-                    >
-                      <LayoutGrid size={16} />
-                      <span>Explore All 4 Categories Catalog</span>
-                      <ArrowRight size={15} />
-                    </a>
-                  </div>
-                </div>
+                )}
               </div>
 
               <a
@@ -355,145 +256,141 @@ export default function Navbar({ activePage, onNavigate }) {
               </a>
             </nav>
 
-            {/* Actions: Freight Quote CTA + Mobile Hamburger */}
+            {/* Header Right Action CTA */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <button
-                className="btn btn-primary d-none-mobile"
                 onClick={() => handleNav('contact')}
-                style={{ fontSize: '15px', padding: '12px 24px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                className="btn btn-primary d-none-mobile"
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: '100px',
+                  fontWeight: 800,
+                  fontSize: '14.5px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
               >
-                <span>Freight Quote</span>
-                <ArrowRight size={16} />
+                <span>Request Quotation</span>
+                <ArrowRight size={15} />
               </button>
 
+              {/* Mobile Hamburger Toggle Button */}
               <button
-                className="mobile-menu-toggle-btn"
-                onClick={() => setMobileOpen(true)}
-                style={{ 
-                  background: '#F8FAFC', 
-                  border: '1.5px solid var(--border)', 
-                  borderRadius: '12px', 
-                  cursor: 'pointer', 
-                  color: 'var(--navy)', 
-                  padding: '8px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center' 
+                onClick={() => setMobileOpen(!mobileOpen)}
+                className="d-none-desktop"
+                style={{
+                  background: 'none',
+                  border: '1.5px solid var(--border)',
+                  borderRadius: '12px',
+                  padding: '10px',
+                  color: 'var(--navy)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
-                aria-label="Open Navigation Menu"
+                aria-label="Toggle Navigation Menu"
               >
-                <Menu size={26} />
+                {mobileOpen ? <X size={24} /> : <Menu size={24} />}
               </button>
             </div>
+
           </div>
         </div>
       </header>
 
-      {/* Mobile Drawer */}
+      {/* Mobile Drawer Navigation Menu */}
       {mobileOpen && (
-        <>
-          <div className="jrp-offcanvas-overlay" onClick={() => setMobileOpen(false)} />
-          <div className="jrp-offcanvas">
-            
-            {/* Drawer Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px', borderBottom: '1px solid #F1F5F9', paddingBottom: '16px' }}>
-              <div onClick={handleLogoClick} style={{ cursor: 'pointer' }}>
-                <img src={logoImg} alt="Saheer Paradise Export" style={{ height: '52px', width: 'auto', objectFit: 'contain', filter: 'contrast(1.08)' }} />
-              </div>
-              <button 
-                onClick={() => setMobileOpen(false)} 
-                style={{ 
-                  background: '#F1F5F9', 
-                  border: 'none', 
-                  cursor: 'pointer', 
-                  color: 'var(--navy)', 
-                  width: '36px', 
-                  height: '36px', 
-                  borderRadius: '50%', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center' 
-                }}
-                aria-label="Close Navigation"
-              >
-                <X size={20} />
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            zIndex: 9998,
+            display: 'flex',
+            justifyContent: 'flex-end'
+          }}
+          onClick={() => setMobileOpen(false)}
+        >
+          <div 
+            style={{
+              width: '85%',
+              maxWidth: '360px',
+              backgroundColor: '#FFFFFF',
+              height: '100%',
+              padding: '24px',
+              boxSizing: 'border-box',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              overflowY: 'auto'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8F0', paddingBottom: '14px' }}>
+              <img src={logoImg} alt="Logo" style={{ height: '48px', objectFit: 'contain' }} />
+              <button onClick={() => setMobileOpen(false)} style={{ background: 'none', border: 'none', color: '#64748B', cursor: 'pointer' }}>
+                <X size={24} />
               </button>
             </div>
 
-            {/* Mobile Nav Links */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
-              
-              <a 
-                href="#home" 
-                onClick={(e) => { e.preventDefault(); handleNav('home'); }} 
-                style={{ 
-                  fontWeight: 800, 
-                  fontSize: '16px', 
-                  color: activePage === 'home' ? 'var(--gold-deep)' : 'var(--navy)', 
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <a
+                href="#"
+                onClick={(e) => { e.preventDefault(); handleNav('home'); }}
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  color: activePage === 'home' ? 'var(--gold-deep)' : 'var(--navy)',
                   textDecoration: 'none',
-                  padding: '10px 14px',
-                  borderRadius: '12px',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
                   backgroundColor: activePage === 'home' ? '#FFFBEB' : 'transparent'
                 }}
               >
                 Home
               </a>
 
-              <a 
-                href="#about" 
-                onClick={(e) => { e.preventDefault(); handleNav('about'); }} 
-                style={{ 
-                  fontWeight: 800, 
-                  fontSize: '16px', 
-                  color: activePage === 'about' ? 'var(--gold-deep)' : 'var(--navy)', 
+              <a
+                href="#"
+                onClick={(e) => { e.preventDefault(); handleNav('about'); }}
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  color: activePage === 'about' ? 'var(--gold-deep)' : 'var(--navy)',
                   textDecoration: 'none',
-                  padding: '10px 14px',
-                  borderRadius: '12px',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
                   backgroundColor: activePage === 'about' ? '#FFFBEB' : 'transparent'
                 }}
               >
                 About Us
               </a>
-              
-              {/* Mobile Product Categories Box */}
-              <div style={{ 
-                border: '1.5px solid var(--border)', 
-                borderRadius: '18px', 
-                padding: '14px', 
-                backgroundColor: '#FFFDF7',
-                boxShadow: '0 4px 14px rgba(200, 148, 10, 0.06)'
-              }}>
+
+              {/* Mobile Categories Accordion */}
+              <div style={{ border: '1px solid #E2E8F0', borderRadius: '14px', overflow: 'hidden' }}>
                 <div 
                   onClick={() => setMobileCategoriesOpen(!mobileCategoriesOpen)} 
                   style={{ 
+                    padding: '12px 14px', 
                     display: 'flex', 
                     justifyContent: 'space-between', 
                     alignItems: 'center', 
                     cursor: 'pointer', 
-                    fontWeight: 800, 
-                    fontSize: '16px', 
+                    backgroundColor: '#F8FAFC',
+                    fontWeight: 800,
+                    fontSize: '15px',
                     color: 'var(--navy)'
                   }}
                 >
-                  <span style={{ color: 'var(--gold-deep)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Sparkles size={16} /> Product Categories
-                  </span>
-                  <div style={{ 
-                    width: '26px', 
-                    height: '26px', 
-                    borderRadius: '50%', 
-                    backgroundColor: '#FEF3C7', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center' 
-                  }}>
-                    <ChevronDown size={16} style={{ transform: mobileCategoriesOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease', color: '#D97706' }} />
-                  </div>
+                  <span>Product Categories</span>
+                  <ChevronDown size={16} style={{ transform: mobileCategoriesOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                 </div>
 
                 {mobileCategoriesOpen && (
-                  <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {CATEGORIES_MENU.map((item) => {
+                  <div style={{ padding: '6px', display: 'flex', flexDirection: 'column', gap: '2px', backgroundColor: '#FFFFFF' }}>
+                    {CATEGORIES_MENU.map(item => {
                       const Icon = item.icon;
                       return (
                         <a
@@ -506,138 +403,69 @@ export default function Navbar({ activePage, onNavigate }) {
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '12px',
+                            gap: '10px',
                             padding: '10px 12px',
-                            borderRadius: '12px',
-                            backgroundColor: '#FFFFFF',
-                            border: '1px solid #E2E8F0',
+                            borderRadius: '8px',
                             textDecoration: 'none',
-                            color: 'var(--navy)',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                            color: '#334155',
+                            fontSize: '14px',
+                            fontWeight: 700
                           }}
                         >
-                          <div style={{ 
-                            width: '34px', 
-                            height: '34px', 
-                            borderRadius: '10px', 
-                            backgroundColor: item.bg, 
-                            color: item.color, 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            <Icon size={18} />
-                          </div>
-                          
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ fontSize: '14.5px', fontWeight: 800, color: 'var(--navy)' }}>
-                                {item.title}
-                              </span>
-                              <span style={{ fontSize: '10px', fontWeight: 800, color: item.color, backgroundColor: item.bg, padding: '1px 5px', borderRadius: '4px' }}>
-                                {item.number}
-                              </span>
-                            </div>
-                            <span style={{ fontSize: '11.5px', color: '#64748B', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {item.subtitle}
-                            </span>
-                          </div>
-
-                          <ChevronRight size={16} style={{ color: '#94A3B8', flexShrink: 0 }} />
+                          <Icon size={16} style={{ color: item.color }} />
+                          <span>{item.title}</span>
                         </a>
                       );
                     })}
-
-                    <a
-                      href="#all-products"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleNav('products', 'All');
-                      }}
-                      style={{
-                        textAlign: 'center',
-                        padding: '10px',
-                        fontSize: '13px',
-                        fontWeight: 800,
-                        color: 'var(--gold-deep)',
-                        backgroundColor: '#FEF3C7',
-                        borderRadius: '10px',
-                        textDecoration: 'none',
-                        marginTop: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <LayoutGrid size={14} />
-                      <span>View All 4 Categories</span>
-                    </a>
                   </div>
                 )}
               </div>
 
-              <a 
-                href="#blog" 
-                onClick={(e) => { e.preventDefault(); handleNav('blog'); }} 
-                style={{ 
-                  fontWeight: 800, 
-                  fontSize: '16px', 
-                  color: activePage === 'blog' ? 'var(--gold-deep)' : 'var(--navy)', 
+              <a
+                href="#"
+                onClick={(e) => { e.preventDefault(); handleNav('blog'); }}
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  color: activePage === 'blog' ? 'var(--gold-deep)' : 'var(--navy)',
                   textDecoration: 'none',
-                  padding: '10px 14px',
-                  borderRadius: '12px',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
                   backgroundColor: activePage === 'blog' ? '#FFFBEB' : 'transparent'
                 }}
               >
                 Blogs
               </a>
 
-              <a 
-                href="#contact" 
-                onClick={(e) => { e.preventDefault(); handleNav('contact'); }} 
-                style={{ 
-                  fontWeight: 800, 
-                  fontSize: '16px', 
-                  color: activePage === 'contact' ? 'var(--gold-deep)' : 'var(--navy)', 
+              <a
+                href="#"
+                onClick={(e) => { e.preventDefault(); handleNav('contact'); }}
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  color: activePage === 'contact' ? 'var(--gold-deep)' : 'var(--navy)',
                   textDecoration: 'none',
-                  padding: '10px 14px',
-                  borderRadius: '12px',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
                   backgroundColor: activePage === 'contact' ? '#FFFBEB' : 'transparent'
                 }}
               >
                 Contact Us
               </a>
-            </div>
+            </nav>
 
-            {/* Offcanvas Contact Info & Quote Button */}
-            <div style={{ marginTop: 'auto', borderTop: '1px solid #F1F5F9', paddingTop: '18px' }}>
-              <h4 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '12px', color: 'var(--navy)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Export Inquiries</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', color: 'var(--gray)' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                  <MapPin size={16} style={{ color: 'var(--gold)', flexShrink: 0, marginTop: '2px' }} />
-                  <span style={{ lineHeight: 1.4 }}>5th Floor, 501, Shashwat World, 80 Ft Rd Rolex, Sardar Chowk, Kothariya Main Rd, Rajkot - Gujarat - 360022</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Mail size={16} style={{ color: 'var(--gold)', flexShrink: 0 }} />
-                  <a href="mailto:saheerparadiseexport@gmail.com" style={{ color: 'inherit', textDecoration: 'none' }}>saheerparadiseexport@gmail.com</a>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Phone size={16} style={{ color: 'var(--gold)', flexShrink: 0 }} />
-                  <a href="tel:+919377988770" style={{ color: 'inherit', textDecoration: 'none', fontWeight: 700 }}>+91 93779 88770 (Sahil Sorathiya)</a>
-                </div>
-              </div>
-
-              <div style={{ marginTop: '18px' }}>
-                <button className="btn btn-primary" onClick={() => handleNav('contact')} style={{ width: '100%', justifyContent: 'center', padding: '12px' }}>
-                  <span>Get A Freight Quote</span>
-                  <ArrowRight size={16} />
-                </button>
-              </div>
+            <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid #E2E8F0' }}>
+              <button
+                onClick={() => handleNav('contact')}
+                className="btn btn-primary"
+                style={{ width: '100%', justifyContent: 'center', padding: '12px' }}
+              >
+                <span>Request Quotation</span>
+                <ArrowRight size={15} />
+              </button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </>
   );
