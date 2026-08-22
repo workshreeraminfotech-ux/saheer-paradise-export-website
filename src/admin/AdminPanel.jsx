@@ -3,7 +3,7 @@ import {
   Package, FileText, Award, LogOut, Plus, Trash2, Edit3, Search, 
   CheckCircle2, X, Upload, ShieldCheck, ExternalLink, RefreshCw,
   Inbox, MessageSquare, Mail, Phone, Clock, Globe, AlertCircle, Download,
-  Check, ArrowRight, Cloud, CloudRain, Database, Eye, Flame, Wheat, Cog, Cylinder, Filter, Sparkles
+  Check, ArrowRight, Eye, Flame, Wheat, Cog, Cylinder, Filter
 } from 'lucide-react';
 import AdminLogin from './AdminLogin';
 import { 
@@ -12,7 +12,7 @@ import {
   getBlogs, addBlog, updateBlog, deleteBlog,
   getCertificates, addCertificate, updateCertificate, deleteCertificate,
   getEnquiries, updateEnquiryStatus, deleteEnquiry, exportEnquiriesCSV,
-  reloadFromCloud, syncAllMasterProductsToCloud, normalizeProduct
+  reloadFromCloud, normalizeProduct
 } from '../utils/adminStore';
 import { PRODUCT_CATEGORIES } from '../data/products';
 
@@ -44,7 +44,7 @@ export const CATEGORY_SUBCATEGORIES = {
 
 export default function AdminPanel() {
   const [authenticated, setAuthenticated] = useState(isAdminLoggedIn());
-  const [activeTab, setActiveTab] = useState('products'); // 'products' | 'product_enquiries' | 'contact_enquiries' | 'blogs' | 'certs' | 'cloud'
+  const [activeTab, setActiveTab] = useState('products'); // 'products' | 'product_enquiries' | 'contact_enquiries' | 'blogs' | 'certs'
   const [toast, setToast] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -53,7 +53,6 @@ export default function AdminPanel() {
   const [blogs, setBlogsState] = useState(getBlogs());
   const [certs, setCertsState] = useState(getCertificates());
   const [enquiries, setEnquiriesState] = useState(getEnquiries());
-  const [selectedEnquiry, setSelectedEnquiry] = useState(null);
   const [enquiryFilter, setEnquiryFilter] = useState('all'); // 'all' | 'product_quote' | 'contact_form'
 
   // Search & Filter State for Products
@@ -74,7 +73,7 @@ export default function AdminPanel() {
 
   // Form States
   const [prodForm, setProdForm] = useState({
-    title: '', category: 'Indian Spices', subcategory: 'Ground Spices', origin: 'India', packaging: '25kg PP Bags / Custom', specs: '', description: '', image: '', hsCode: 'HS 0910', isFeatured: false
+    title: '', category: 'Indian Spices', subcategory: 'Ground Spices', packaging: '25kg PP Bags / Custom', specs: '', description: '', image: '', hsCode: 'HS 0910', isFeatured: false
   });
 
   const [blogForm, setBlogForm] = useState({
@@ -116,50 +115,6 @@ export default function AdminPanel() {
   const handleLogout = () => {
     logoutAdmin();
     setAuthenticated(false);
-  };
-
-  // 1-Click Cloud Re-sync Handler
-  const handleReloadCloud = async () => {
-    setIsSyncing(true);
-    const res = await reloadFromCloud();
-    setIsSyncing(false);
-    if (res.success) {
-      refreshLocalState();
-      showNotification(`Live Firebase Cloud synced successfully! (${res.count} products active)`);
-    } else {
-      showNotification(`Cloud sync note: Local cache is active.`);
-    }
-  };
-
-  // 1-Click Master Catalog Push to Cloud
-  const handlePushAllMasterToCloud = async () => {
-    if (window.confirm('Do you want to sync all master products and custom products directly to live Firebase Firestore?')) {
-      setIsSyncing(true);
-      const res = await syncAllMasterProductsToCloud();
-      setIsSyncing(false);
-      refreshLocalState();
-      showNotification(`Pushed & verified ${res.count}/${res.total} products on Firebase Firestore! 🚀`);
-    }
-  };
-
-  // Export Full JSON Backup
-  const handleExportFullBackup = () => {
-    const backupData = {
-      exportDate: new Date().toISOString(),
-      company: 'Saheer Paradise Export',
-      products: getProducts(),
-      blogs: getBlogs(),
-      certificates: getCertificates(),
-      enquiries: getEnquiries()
-    };
-    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `saheer_paradise_backup_${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showNotification('Full JSON backup downloaded successfully!');
   };
 
   // Image Upload Handler with High-Ratio Browser Compression
@@ -212,7 +167,6 @@ export default function AdminPanel() {
       title: '', 
       category: 'Indian Spices', 
       subcategory: 'Ground Spices', 
-      origin: 'India', 
       packaging: '25kg PP Bags / Custom', 
       specs: '', 
       description: '', 
@@ -231,7 +185,6 @@ export default function AdminPanel() {
       title: prod.title || '',
       category: cat,
       subcategory: prod.subcategory || subOptions[0] || 'Ground Spices',
-      origin: prod.origin || '',
       packaging: prod.packaging || '',
       specs: prod.specs || '',
       description: prod.description || prod.desc || '',
@@ -255,7 +208,7 @@ export default function AdminPanel() {
         subcategory: prodForm.subcategory
       });
       setProductsState(updated);
-      showNotification(`Product "${prodForm.title}" updated & saved live!`);
+      showNotification(`Product "${prodForm.title}" saved & synced to live Firebase!`);
     } else {
       const updated = await addProduct({ 
         ...prodForm, 
@@ -264,7 +217,7 @@ export default function AdminPanel() {
         subcategory: prodForm.subcategory
       });
       setProductsState(updated);
-      showNotification(`New Product "${prodForm.title}" created & saved live!`);
+      showNotification(`New Product "${prodForm.title}" created & synced to live Firebase!`);
     }
     setShowProductModal(false);
   };
@@ -273,7 +226,7 @@ export default function AdminPanel() {
     if (window.confirm(`Are you sure you want to delete "${title}"?`)) {
       const updated = await deleteProduct(id);
       setProductsState(updated);
-      showNotification(`Product "${title}" removed.`);
+      showNotification(`Product "${title}" removed from live database.`);
     }
   };
 
@@ -306,11 +259,11 @@ export default function AdminPanel() {
     if (editingBlog) {
       const updated = await updateBlog({ ...editingBlog, ...blogForm });
       setBlogsState(updated);
-      showNotification(`Article "${blogForm.title}" saved & synced!`);
+      showNotification(`Article "${blogForm.title}" saved & synced to live Firebase!`);
     } else {
       const updated = await addBlog(blogForm);
       setBlogsState(updated);
-      showNotification(`New Article "${blogForm.title}" published & synced!`);
+      showNotification(`New Article "${blogForm.title}" published & synced to live Firebase!`);
     }
     setShowBlogModal(false);
   };
@@ -350,11 +303,11 @@ export default function AdminPanel() {
     if (editingCert) {
       const updated = await updateCertificate({ ...editingCert, ...certForm });
       setCertsState(updated);
-      showNotification(`Certificate "${certForm.name}" saved & synced!`);
+      showNotification(`Certificate "${certForm.name}" saved & synced to live Firebase!`);
     } else {
       const updated = await addCertificate(certForm);
       setCertsState(updated);
-      showNotification(`New Certificate "${certForm.name}" added & synced!`);
+      showNotification(`New Certificate "${certForm.name}" added & synced to live Firebase!`);
     }
     setShowCertModal(false);
   };
@@ -408,7 +361,6 @@ export default function AdminPanel() {
       const q = searchQuery.trim().toLowerCase();
       const matchesQuery = q === '' || 
         (p.title && p.title.toLowerCase().includes(q)) ||
-        (p.origin && p.origin.toLowerCase().includes(q)) ||
         (p.hsCode && p.hsCode.toLowerCase().includes(q)) ||
         (p.specs && p.specs.toLowerCase().includes(q)) ||
         (subcat.toLowerCase().includes(q));
@@ -498,29 +450,6 @@ export default function AdminPanel() {
 
           {/* Quick Header Actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <button
-              onClick={handleReloadCloud}
-              disabled={isSyncing}
-              title="Refresh and sync data directly from Firebase Firestore"
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.1)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                color: '#FFFFFF',
-                padding: '9px 15px',
-                borderRadius: '10px',
-                fontSize: '13px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <RefreshCw size={14} className={isSyncing ? 'spin' : ''} />
-              <span>{isSyncing ? 'Syncing...' : 'Sync Cloud'}</span>
-            </button>
-
             <a
               href="/"
               target="_blank"
@@ -787,28 +716,6 @@ export default function AdminPanel() {
             <Award size={16} />
             <span>Certifications ({certs.length})</span>
           </button>
-
-          <button
-            onClick={() => setActiveTab('cloud')}
-            style={{
-              padding: '12px 22px',
-              borderRadius: '12px',
-              border: 'none',
-              backgroundColor: activeTab === 'cloud' ? '#002147' : 'transparent',
-              color: activeTab === 'cloud' ? '#FFFFFF' : '#475569',
-              fontWeight: 800,
-              fontSize: '14px',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s ease',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            <Cloud size={16} style={{ color: activeTab === 'cloud' ? '#38BDF8' : '#0284C7' }} />
-            <span>Cloud & Backup Hub</span>
-          </button>
         </div>
 
         {/* ========================================================= */}
@@ -833,7 +740,7 @@ export default function AdminPanel() {
                   <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
                   <input
                     type="text"
-                    placeholder="Search by title, origin, HS code, or specifications..."
+                    placeholder="Search by product title, HS code, or specifications..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     style={{
@@ -857,28 +764,7 @@ export default function AdminPanel() {
                   )}
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button
-                    onClick={handlePushAllMasterToCloud}
-                    disabled={isSyncing}
-                    style={{
-                      backgroundColor: '#F0F9FF',
-                      border: '1.5px solid #BAE6FD',
-                      color: '#0369A1',
-                      padding: '12px 20px',
-                      borderRadius: '100px',
-                      fontWeight: 800,
-                      fontSize: '13.5px',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <Cloud size={16} />
-                    <span>Sync to Firebase</span>
-                  </button>
-
+                <div>
                   <button
                     onClick={openAddProduct}
                     style={{
@@ -1033,17 +919,16 @@ export default function AdminPanel() {
               )}
             </div>
 
-            {/* Products Table */}
+            {/* Products Table (Without Location/Origin Column) */}
             <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', border: '1.5px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,33,71,0.04)' }}>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1.5px solid #CBD5E1', color: '#002147', fontWeight: 800 }}>
-                      <th style={{ padding: '16px 20px', width: '340px' }}>Product Title & Image</th>
-                      <th style={{ padding: '16px 20px', width: '180px' }}>Category & Sub-Type</th>
-                      <th style={{ padding: '16px 20px', width: '160px' }}>Origin / Sourcing</th>
-                      <th style={{ padding: '16px 20px', width: '130px' }}>HS Code</th>
-                      <th style={{ padding: '16px 20px', width: '220px' }}>Specifications</th>
+                      <th style={{ padding: '16px 20px', width: '380px' }}>Product Title & Image</th>
+                      <th style={{ padding: '16px 20px', width: '200px' }}>Category & Sub-Type</th>
+                      <th style={{ padding: '16px 20px', width: '150px' }}>HS Code</th>
+                      <th style={{ padding: '16px 20px', width: '280px' }}>Specifications & Packaging</th>
                       <th style={{ padding: '16px 20px', textAlign: 'right', width: '140px' }}>Actions</th>
                     </tr>
                   </thead>
@@ -1080,7 +965,7 @@ export default function AdminPanel() {
                                 <strong style={{ fontSize: '14.5px', color: '#002147', display: 'block', lineHeight: 1.3 }}>
                                   {p.title}
                                 </strong>
-                                <span style={{ fontSize: '12px', color: '#64748B', marginTop: '3px', display: 'block', maxWidth: '280px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <span style={{ fontSize: '12px', color: '#64748B', marginTop: '3px', display: 'block', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {p.description || p.desc}
                                 </span>
                               </div>
@@ -1109,11 +994,6 @@ export default function AdminPanel() {
                             )}
                           </td>
 
-                          {/* Origin */}
-                          <td style={{ padding: '16px 20px', color: '#475569', fontSize: '13px', fontWeight: 600 }}>
-                            {p.origin || 'India'}
-                          </td>
-
                           {/* HS Code */}
                           <td style={{ padding: '16px 20px', color: '#002147', fontWeight: 700, fontSize: '13px' }}>
                             <span style={{ backgroundColor: '#F1F5F9', padding: '3px 8px', borderRadius: '6px', border: '1px solid #CBD5E1' }}>
@@ -1121,9 +1001,10 @@ export default function AdminPanel() {
                             </span>
                           </td>
 
-                          {/* Specs */}
-                          <td style={{ padding: '16px 20px', color: '#64748B', fontSize: '12.5px', maxWidth: '220px' }}>
-                            {p.specs || p.packaging || 'Export Quality Grade'}
+                          {/* Specs & Packaging */}
+                          <td style={{ padding: '16px 20px', color: '#64748B', fontSize: '12.5px', maxWidth: '280px' }}>
+                            <div style={{ fontWeight: 600, color: '#334155' }}>{p.specs || 'Export Grade Standard'}</div>
+                            {p.packaging && <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>📦 {p.packaging}</div>}
                           </td>
 
                           {/* Actions */}
@@ -1176,7 +1057,7 @@ export default function AdminPanel() {
 
                     {filteredProducts.length === 0 && (
                       <tr>
-                        <td colSpan={6} style={{ padding: '60px 20px', textAlign: 'center', color: '#64748B' }}>
+                        <td colSpan={5} style={{ padding: '60px 20px', textAlign: 'center', color: '#64748B' }}>
                           <AlertCircle size={36} style={{ color: '#94A3B8', marginBottom: '12px' }} />
                           <h4 style={{ fontSize: '17px', fontWeight: 800, color: '#002147', margin: '0 0 6px' }}>No Products Found</h4>
                           <p style={{ fontSize: '13.5px', margin: 0 }}>Try clearing the search query or resetting the category filters.</p>
@@ -1405,120 +1286,10 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* ========================================================= */}
-        {/* TAB 6: CLOUD & BACKUP HUB */}
-        {/* ========================================================= */}
-        {activeTab === 'cloud' && (
-          <div style={{ display: 'grid', gap: '24px' }}>
-            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '32px', border: '1.5px solid #E2E8F0', boxShadow: '0 8px 24px rgba(0,33,71,0.04)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: '#F0FDF4', border: '1.5px solid #BBF7D0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16A34A' }}>
-                  <Cloud size={24} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '20px', fontWeight: 900, color: '#002147', margin: 0 }}>Firebase Firestore Cloud Database</h3>
-                  <span style={{ fontSize: '13px', color: '#64748B' }}>Project ID: <strong>saheer-paradise-export</strong> (Direct Zero-Latency REST Engine)</span>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', margin: '24px 0' }}>
-                <div style={{ padding: '16px', borderRadius: '16px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Products Collection</span>
-                  <div style={{ fontSize: '24px', fontWeight: 900, color: '#002147', margin: '6px 0' }}>{products.length} Docs</div>
-                  <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: 700 }}>🟢 Synced Worldwide</span>
-                </div>
-
-                <div style={{ padding: '16px', borderRadius: '16px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Blogs Collection</span>
-                  <div style={{ fontSize: '24px', fontWeight: 900, color: '#002147', margin: '6px 0' }}>{blogs.length} Docs</div>
-                  <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: 700 }}>🟢 Active</span>
-                </div>
-
-                <div style={{ padding: '16px', borderRadius: '16px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Certificates Collection</span>
-                  <div style={{ fontSize: '24px', fontWeight: 900, color: '#002147', margin: '6px 0' }}>{certs.length} Docs</div>
-                  <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: 700 }}>🟢 Active</span>
-                </div>
-
-                <div style={{ padding: '16px', borderRadius: '16px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Enquiries Collection</span>
-                  <div style={{ fontSize: '24px', fontWeight: 900, color: '#002147', margin: '6px 0' }}>{enquiries.length} Docs</div>
-                  <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: 700 }}>🟢 Active</span>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', paddingTop: '20px', borderTop: '1px solid #F1F5F9' }}>
-                <button
-                  onClick={handlePushAllMasterToCloud}
-                  disabled={isSyncing}
-                  style={{
-                    backgroundColor: '#002147',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    padding: '14px 28px',
-                    borderRadius: '12px',
-                    fontWeight: 800,
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: '0 4px 14px rgba(0, 33, 71, 0.2)'
-                  }}
-                >
-                  <Cloud size={18} />
-                  <span>Push All {products.length} Products to Firebase</span>
-                </button>
-
-                <button
-                  onClick={handleReloadCloud}
-                  disabled={isSyncing}
-                  style={{
-                    backgroundColor: '#F8FAFC',
-                    border: '1.5px solid #CBD5E1',
-                    color: '#002147',
-                    padding: '14px 24px',
-                    borderRadius: '12px',
-                    fontWeight: 800,
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  <RefreshCw size={16} className={isSyncing ? 'spin' : ''} />
-                  <span>Force Re-fetch from Firebase</span>
-                </button>
-
-                <button
-                  onClick={handleExportFullBackup}
-                  style={{
-                    backgroundColor: '#F0FDF4',
-                    border: '1.5px solid #86EFAC',
-                    color: '#15803D',
-                    padding: '14px 24px',
-                    borderRadius: '12px',
-                    fontWeight: 800,
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  <Download size={16} />
-                  <span>Download Full JSON Backup</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
       </div>
 
       {/* ========================================================= */}
-      {/* MODAL 1: ADD / EDIT PRODUCT */}
+      {/* MODAL 1: ADD / EDIT PRODUCT (Without Location/Origin box) */}
       {/* ========================================================= */}
       {showProductModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(7,23,44,0.75)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(4px)' }}>
@@ -1578,27 +1349,15 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Origin</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Erode & Sangli, India"
-                    value={prodForm.origin}
-                    onChange={(e) => setProdForm({ ...prodForm, origin: e.target.value })}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>HS Code</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. HS 09103020"
-                    value={prodForm.hsCode}
-                    onChange={(e) => setProdForm({ ...prodForm, hsCode: e.target.value })}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
-                  />
-                </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>HS Code</label>
+                <input
+                  type="text"
+                  placeholder="e.g. HS 09103020"
+                  value={prodForm.hsCode}
+                  onChange={(e) => setProdForm({ ...prodForm, hsCode: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
+                />
               </div>
 
               <div>
@@ -1691,7 +1450,7 @@ export default function AdminPanel() {
       )}
 
       {/* ========================================================= */}
-      {/* MODAL 2: ADD / EDIT BLOG */}
+      {/* MODAL 2: ADD / EDIT BLOG (With Photo Upload button) */}
       {/* ========================================================= */}
       {showBlogModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(7,23,44,0.75)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(4px)' }}>
@@ -1742,14 +1501,26 @@ export default function AdminPanel() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Cover Image URL</label>
-                <input
-                  type="text"
-                  placeholder="https://images.unsplash.com/..."
-                  value={blogForm.image}
-                  onChange={(e) => setBlogForm({ ...blogForm, image: e.target.value })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
-                />
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Cover Image (URL or Upload File)</label>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="Paste Cover Image URL or select file below"
+                    value={blogForm.image}
+                    onChange={(e) => setBlogForm({ ...blogForm, image: e.target.value })}
+                    style={{ flex: 1, padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px' }}
+                  />
+                  <label style={{ backgroundColor: '#F1F5F9', border: '1.5px solid #CBD5E1', padding: '10px 16px', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '13px', color: '#002147', display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                    <Upload size={15} /> Upload File
+                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleImageFileChange(e, (url) => setBlogForm({ ...blogForm, image: url }))} />
+                  </label>
+                </div>
+                {blogForm.image && (
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <img src={blogForm.image} alt="Blog Preview" style={{ height: '60px', width: '90px', borderRadius: '10px', objectFit: 'cover', border: '1px solid #CBD5E1' }} />
+                    <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: 700 }}>✓ Image uploaded & preview ready</span>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1795,7 +1566,7 @@ export default function AdminPanel() {
       )}
 
       {/* ========================================================= */}
-      {/* MODAL 3: ADD / EDIT CERTIFICATE */}
+      {/* MODAL 3: ADD / EDIT CERTIFICATE (With Logo Upload button) */}
       {/* ========================================================= */}
       {showCertModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(7,23,44,0.75)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(4px)' }}>
@@ -1845,14 +1616,26 @@ export default function AdminPanel() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Logo Image URL / Upload</label>
-                <input
-                  type="text"
-                  placeholder="Image URL or upload"
-                  value={certForm.logo}
-                  onChange={(e) => setCertForm({ ...certForm, logo: e.target.value })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
-                />
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Certificate Logo (URL or Upload File)</label>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="Paste Logo URL or select file below"
+                    value={certForm.logo}
+                    onChange={(e) => setCertForm({ ...certForm, logo: e.target.value })}
+                    style={{ flex: 1, padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px' }}
+                  />
+                  <label style={{ backgroundColor: '#F1F5F9', border: '1.5px solid #CBD5E1', padding: '10px 16px', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '13px', color: '#002147', display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                    <Upload size={15} /> Upload File
+                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleImageFileChange(e, (url) => setCertForm({ ...certForm, logo: url }))} />
+                  </label>
+                </div>
+                {certForm.logo && (
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <img src={certForm.logo} alt="Cert Preview" style={{ height: '50px', width: '50px', borderRadius: '10px', objectFit: 'contain', border: '1px solid #CBD5E1', backgroundColor: '#F8FAFC', padding: '4px' }} />
+                    <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: 700 }}>✓ Logo preview ready</span>
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px', borderTop: '1.5px solid #F1F5F9', paddingTop: '16px' }}>
