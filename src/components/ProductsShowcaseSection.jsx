@@ -1,60 +1,37 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Eye, Flame, Wheat, Cog, Cylinder, CheckCircle2, Sparkles } from 'lucide-react';
+import { ArrowRight, Eye, Flame, Wheat, Cog, Cylinder, Sparkles } from 'lucide-react';
 import { useStoreProducts } from '../utils/useStore';
 import { normalizeProduct } from '../utils/adminStore';
-import { PRODUCT_CATEGORIES } from '../data/products';
 
 export default function ProductsShowcaseSection({ onSelectProduct, onOpenQuote, onNavigate }) {
   const storeProds = useStoreProducts();
   const allProducts = Array.isArray(storeProds) ? storeProds : [];
-  const [activeCategoryFilter, setActiveCategoryFilter] = useState('All');
 
-  // Curate 2 to 3 featured products from each of the 4 Master Categories
-  const featuredProductsList = useMemo(() => {
+  // Curate 4 to 6 flagship products (1-2 from each vertical) for a clean, non-cluttered preview
+  const featuredProducts = useMemo(() => {
     const normalized = allProducts.map(normalizeProduct).filter(Boolean);
     
-    // Group products by category
-    const grouped = {
-      'Indian Spices': [],
-      'Agro Commodities': [],
-      'Machinery': [],
-      'Pipes': []
-    };
+    const spices = normalized.filter(p => p.category === 'Indian Spices');
+    const agro = normalized.filter(p => p.category === 'Agro Commodities');
+    const machinery = normalized.filter(p => p.category === 'Machinery');
+    const pipes = normalized.filter(p => p.category === 'Pipes');
 
-    normalized.forEach(p => {
-      const cat = p.category;
-      if (grouped[cat]) {
-        grouped[cat].push(p);
-      }
-    });
+    const curated = [
+      // 1-2 Spices
+      spices[0] || normalized[0],
+      spices[1] || normalized[1],
+      // 1-2 Agro Commodities
+      agro[0] || normalized[2],
+      agro[1] || normalized[3],
+      // 1 Machinery
+      machinery[0] || normalized[4],
+      // 1 Pipes
+      pipes[0] || normalized[5]
+    ].filter(Boolean);
 
-    // Pick top 2-3 best from each category
-    const selected = [
-      // 2-3 Spices
-      ...grouped['Indian Spices'].slice(0, 3),
-      // 2-3 Agro Commodities
-      ...grouped['Agro Commodities'].slice(0, 3),
-      // 2-3 Machinery
-      ...grouped['Machinery'].slice(0, 3),
-      // 2-3 Pipes
-      ...grouped['Pipes'].slice(0, 3)
-    ];
-
-    if (selected.length === 0) {
-      return normalized.slice(0, 12);
-    }
-
-    return selected;
+    return curated.slice(0, 6);
   }, [allProducts]);
-
-  // Filtered by active tab on homepage
-  const displayedProducts = useMemo(() => {
-    if (activeCategoryFilter === 'All') {
-      return featuredProductsList;
-    }
-    return featuredProductsList.filter(p => p.category === activeCategoryFilter);
-  }, [featuredProductsList, activeCategoryFilter]);
 
   const getCategoryIcon = (cat) => {
     if (cat === 'Indian Spices') return <Flame size={13} style={{ color: '#EA580C' }} />;
@@ -73,77 +50,27 @@ export default function ProductsShowcaseSection({ onSelectProduct, onOpenQuote, 
   };
 
   return (
-    <section className="py-50" id="products-section" style={{ background: '#FFFFFF', padding: '64px 0 74px' }}>
+    <section className="py-50" id="products-section" style={{ background: '#FFFFFF', padding: '60px 0 70px' }}>
       <div className="container">
         
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '36px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '44px' }}>
           <div className="section-title">
             <span className="eyebrow" style={{ letterSpacing: '1.8px' }}>
-              GLOBAL EXPORT PORTFOLIO & MULTI-SECTOR SUPPLY
+              GLOBAL EXPORT PORTFOLIO
             </span>
             <h2 style={{ color: 'var(--navy)', marginTop: '12px', fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 900 }}>
-              Our Featured <span style={{ color: 'var(--gold)' }}>Export Categories & Products</span>
+              Our Featured <span style={{ color: 'var(--gold)' }}>Export Commodities</span>
             </h2>
-            <p style={{ marginTop: '12px', color: 'var(--gray)', maxWidth: '680px', margin: '12px auto 0', fontSize: '15px', lineHeight: 1.6 }}>
-              Discover our core certified export verticals — from premium Indian spices and Sortex agro commodities to industrial processing machinery and pipeline infrastructure.
+            <p style={{ marginTop: '12px', color: 'var(--gray)', maxWidth: '640px', margin: '12px auto 0', fontSize: '15px', lineHeight: 1.6 }}>
+              A curated selection of our certified export verticals — quality tested, sortex graded, and container packed for worldwide delivery.
             </p>
           </div>
         </div>
 
-        {/* Category Filter Chips */}
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '40px' }}>
-          <button
-            onClick={() => setActiveCategoryFilter('All')}
-            style={{
-              padding: '9px 20px',
-              borderRadius: '100px',
-              border: activeCategoryFilter === 'All' ? '1.5px solid var(--navy)' : '1.5px solid var(--border)',
-              backgroundColor: activeCategoryFilter === 'All' ? 'var(--navy)' : '#F8FAFC',
-              color: activeCategoryFilter === 'All' ? '#FFFFFF' : '#475569',
-              fontWeight: 800,
-              fontSize: '13.5px',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              boxShadow: activeCategoryFilter === 'All' ? '0 4px 14px rgba(0, 33, 71, 0.18)' : 'none'
-            }}
-          >
-            All Featured ({featuredProductsList.length})
-          </button>
-
-          {PRODUCT_CATEGORIES.map(cat => {
-            const isActive = activeCategoryFilter === cat;
-            const badge = getCategoryBadgeStyle(cat);
-            return (
-              <button
-                key={cat}
-                onClick={() => setActiveCategoryFilter(cat)}
-                style={{
-                  padding: '9px 20px',
-                  borderRadius: '100px',
-                  border: isActive ? `1.5px solid ${badge.color}` : '1.5px solid var(--border)',
-                  backgroundColor: isActive ? badge.bg : '#F8FAFC',
-                  color: isActive ? badge.color : '#475569',
-                  fontWeight: 800,
-                  fontSize: '13.5px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: isActive ? '0 4px 14px rgba(0,0,0,0.06)' : 'none'
-                }}
-              >
-                {getCategoryIcon(cat)}
-                <span>{cat}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* 12 Products Grid (2-3 items from each of 4 categories) */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '26px' }}>
-          {displayedProducts.map((item, idx) => {
+        {/* Clean 6-Product Flagship Grid (Without category filter buttons) */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '28px' }}>
+          {featuredProducts.map((item, idx) => {
             const badge = getCategoryBadgeStyle(item.category);
             return (
               <motion.div
@@ -151,7 +78,7 @@ export default function ProductsShowcaseSection({ onSelectProduct, onOpenQuote, 
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.35, delay: (idx % 4) * 0.05 }}
+                transition={{ duration: 0.35, delay: (idx % 3) * 0.08 }}
                 style={{ 
                   background: '#FFFFFF', 
                   borderRadius: '22px', 
@@ -167,7 +94,7 @@ export default function ProductsShowcaseSection({ onSelectProduct, onOpenQuote, 
                 {/* Product Image — Object-Fit Contain (Uncropped) */}
                 <div 
                   style={{ 
-                    height: '220px', 
+                    height: '230px', 
                     backgroundColor: '#FFFFFF', 
                     display: 'flex', 
                     alignItems: 'center', 
@@ -260,11 +187,11 @@ export default function ProductsShowcaseSection({ onSelectProduct, onOpenQuote, 
         </div>
 
         {/* View All Products CTA Link */}
-        <div style={{ textAlign: 'center', marginTop: '48px' }}>
+        <div style={{ textAlign: 'center', marginTop: '44px' }}>
           <button
             onClick={() => onNavigate ? onNavigate('products') : null}
             className="btn btn-primary"
-            style={{ padding: '15px 36px', fontSize: '15px', display: 'inline-flex', alignItems: 'center', gap: '8px', borderRadius: '100px', boxShadow: '0 8px 24px rgba(0, 33, 71, 0.2)' }}
+            style={{ padding: '14px 34px', fontSize: '15px', display: 'inline-flex', alignItems: 'center', gap: '8px', borderRadius: '100px', boxShadow: '0 8px 24px rgba(0, 33, 71, 0.2)' }}
           >
             <span>Explore Complete Multi-Category Catalog</span>
             <ArrowRight size={18} />
