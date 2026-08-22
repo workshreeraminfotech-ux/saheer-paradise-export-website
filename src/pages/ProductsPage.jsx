@@ -571,12 +571,6 @@ export default function ProductsPage({ initialCategory = 'Indian Spices', onSele
                     {product.title}
                   </h3>
 
-                  {product.origin && (
-                    <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, marginBottom: '10px', display: 'block' }}>
-                      📍 {product.origin}
-                    </span>
-                  )}
-
                   <p style={{
                     fontSize: '13.5px',
                     color: 'var(--gray)',

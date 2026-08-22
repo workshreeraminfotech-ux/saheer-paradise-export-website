@@ -46,7 +46,6 @@ export default function AdminPanel() {
   const [authenticated, setAuthenticated] = useState(isAdminLoggedIn());
   const [activeTab, setActiveTab] = useState('products'); // 'products' | 'product_enquiries' | 'contact_enquiries' | 'blogs' | 'certs'
   const [toast, setToast] = useState('');
-  const [isSyncing, setIsSyncing] = useState(false);
 
   // Stores
   const [products, setProductsState] = useState(getProducts());
@@ -71,9 +70,9 @@ export default function AdminPanel() {
   const [showCertModal, setShowCertModal] = useState(false);
   const [editingCert, setEditingCert] = useState(null);
 
-  // Form States
+  // Form States (Cleaned without origin, specs, packaging)
   const [prodForm, setProdForm] = useState({
-    title: '', category: 'Indian Spices', subcategory: 'Ground Spices', packaging: '25kg PP Bags / Custom', specs: '', description: '', image: '', hsCode: 'HS 0910', isFeatured: false
+    title: '', category: 'Indian Spices', subcategory: 'Ground Spices', description: '', image: '', hsCode: 'HS 0910', isFeatured: false
   });
 
   const [blogForm, setBlogForm] = useState({
@@ -151,7 +150,7 @@ export default function AdminPanel() {
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Ultra-lightweight JPEG (~25KB - 35KB) for instant Firestore writes & unlimited storage
+        // Lightweight JPEG (~25KB - 35KB) for instant Firestore writes & unlimited storage
         const compressedUrl = canvas.toDataURL('image/jpeg', 0.68);
         callback(compressedUrl);
       };
@@ -167,8 +166,6 @@ export default function AdminPanel() {
       title: '', 
       category: 'Indian Spices', 
       subcategory: 'Ground Spices', 
-      packaging: '25kg PP Bags / Custom', 
-      specs: '', 
       description: '', 
       image: '', 
       hsCode: 'HS 0910', 
@@ -185,8 +182,6 @@ export default function AdminPanel() {
       title: prod.title || '',
       category: cat,
       subcategory: prod.subcategory || subOptions[0] || 'Ground Spices',
-      packaging: prod.packaging || '',
-      specs: prod.specs || '',
       description: prod.description || prod.desc || '',
       image: prod.image || '',
       hsCode: prod.hsCode || '',
@@ -208,7 +203,7 @@ export default function AdminPanel() {
         subcategory: prodForm.subcategory
       });
       setProductsState(updated);
-      showNotification(`Product "${prodForm.title}" saved & synced to live Firebase!`);
+      showNotification(`Product "${prodForm.title}" saved & updated in live Firebase!`);
     } else {
       const updated = await addProduct({ 
         ...prodForm, 
@@ -362,7 +357,6 @@ export default function AdminPanel() {
       const matchesQuery = q === '' || 
         (p.title && p.title.toLowerCase().includes(q)) ||
         (p.hsCode && p.hsCode.toLowerCase().includes(q)) ||
-        (p.specs && p.specs.toLowerCase().includes(q)) ||
         (subcat.toLowerCase().includes(q));
         
       return matchesCat && matchesSubCat && matchesQuery;
@@ -740,7 +734,7 @@ export default function AdminPanel() {
                   <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
                   <input
                     type="text"
-                    placeholder="Search by product title, HS code, or specifications..."
+                    placeholder="Search by product title, HS code, or sub-category..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     style={{
@@ -852,7 +846,7 @@ export default function AdminPanel() {
                 })}
               </div>
 
-              {/* Row 3: Subcategory Filter Pills (e.g. Ground Spices, Whole Spices, Seed Spices for Indian Spices) */}
+              {/* Row 3: Subcategory Filter Pills */}
               {selectedCat !== 'All' && CATEGORY_SUBCATEGORIES[selectedCat] && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed #E2E8F0' }}>
                   <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#D97706', textTransform: 'uppercase', letterSpacing: '0.6px', marginRight: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -919,17 +913,16 @@ export default function AdminPanel() {
               )}
             </div>
 
-            {/* Products Table (Without Location/Origin Column) */}
+            {/* Products Table (Cleaned without Specs / Packaging / Origin) */}
             <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', border: '1.5px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,33,71,0.04)' }}>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1.5px solid #CBD5E1', color: '#002147', fontWeight: 800 }}>
-                      <th style={{ padding: '16px 20px', width: '380px' }}>Product Title & Image</th>
-                      <th style={{ padding: '16px 20px', width: '200px' }}>Category & Sub-Type</th>
-                      <th style={{ padding: '16px 20px', width: '150px' }}>HS Code</th>
-                      <th style={{ padding: '16px 20px', width: '280px' }}>Specifications & Packaging</th>
-                      <th style={{ padding: '16px 20px', textAlign: 'right', width: '140px' }}>Actions</th>
+                      <th style={{ padding: '16px 20px', width: '42%' }}>Product Title & Image</th>
+                      <th style={{ padding: '16px 20px', width: '25%' }}>Category & Sub-Type</th>
+                      <th style={{ padding: '16px 20px', width: '18%' }}>HS Code</th>
+                      <th style={{ padding: '16px 20px', textAlign: 'right', width: '15%' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -965,7 +958,7 @@ export default function AdminPanel() {
                                 <strong style={{ fontSize: '14.5px', color: '#002147', display: 'block', lineHeight: 1.3 }}>
                                   {p.title}
                                 </strong>
-                                <span style={{ fontSize: '12px', color: '#64748B', marginTop: '3px', display: 'block', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <span style={{ fontSize: '12px', color: '#64748B', marginTop: '3px', display: 'block', maxWidth: '360px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {p.description || p.desc}
                                 </span>
                               </div>
@@ -999,12 +992,6 @@ export default function AdminPanel() {
                             <span style={{ backgroundColor: '#F1F5F9', padding: '3px 8px', borderRadius: '6px', border: '1px solid #CBD5E1' }}>
                               {p.hsCode || 'HS 0910'}
                             </span>
-                          </td>
-
-                          {/* Specs & Packaging */}
-                          <td style={{ padding: '16px 20px', color: '#64748B', fontSize: '12.5px', maxWidth: '280px' }}>
-                            <div style={{ fontWeight: 600, color: '#334155' }}>{p.specs || 'Export Grade Standard'}</div>
-                            {p.packaging && <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>📦 {p.packaging}</div>}
                           </td>
 
                           {/* Actions */}
@@ -1057,7 +1044,7 @@ export default function AdminPanel() {
 
                     {filteredProducts.length === 0 && (
                       <tr>
-                        <td colSpan={5} style={{ padding: '60px 20px', textAlign: 'center', color: '#64748B' }}>
+                        <td colSpan={4} style={{ padding: '60px 20px', textAlign: 'center', color: '#64748B' }}>
                           <AlertCircle size={36} style={{ color: '#94A3B8', marginBottom: '12px' }} />
                           <h4 style={{ fontSize: '17px', fontWeight: 800, color: '#002147', margin: '0 0 6px' }}>No Products Found</h4>
                           <p style={{ fontSize: '13.5px', margin: 0 }}>Try clearing the search query or resetting the category filters.</p>
@@ -1289,7 +1276,7 @@ export default function AdminPanel() {
       </div>
 
       {/* ========================================================= */}
-      {/* MODAL 1: ADD / EDIT PRODUCT (Without Location/Origin box) */}
+      {/* MODAL 1: ADD / EDIT PRODUCT (Clean: No Origin, Specs, Packaging) */}
       {/* ========================================================= */}
       {showProductModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(7,23,44,0.75)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(4px)' }}>
@@ -1381,28 +1368,6 @@ export default function AdminPanel() {
                     <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: 700 }}>✓ Image preview active</span>
                   </div>
                 )}
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Specifications</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Curcumin > 3.5% | Moisture < 10%"
-                  value={prodForm.specs}
-                  onChange={(e) => setProdForm({ ...prodForm, specs: e.target.value })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#002147', marginBottom: '6px' }}>Packaging Details</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 25kg / 50kg PP Bags / Custom Vacuum"
-                  value={prodForm.packaging}
-                  onChange={(e) => setProdForm({ ...prodForm, packaging: e.target.value })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
-                />
               </div>
 
               <div>
