@@ -1,133 +1,262 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Eye } from 'lucide-react';
+import { ArrowRight, Eye, Flame, Wheat, Cog, Cylinder, CheckCircle2, Sparkles } from 'lucide-react';
 import { useStoreProducts } from '../utils/useStore';
-
-// Top 6 most exported spices from India
-const TOP_6_EXPORT_IDS = [
-  'turmeric-powder',
-  'chilli-powder',
-  'cumin-seeds',
-  'black-pepper',
-  'green-cardamom',
-  'ginger-powder'
-];
+import { normalizeProduct } from '../utils/adminStore';
+import { PRODUCT_CATEGORIES } from '../data/products';
 
 export default function ProductsShowcaseSection({ onSelectProduct, onOpenQuote, onNavigate }) {
   const storeProds = useStoreProducts();
   const allProducts = Array.isArray(storeProds) ? storeProds : [];
-  // Get featured / top products safely
-  let topExportProducts = TOP_6_EXPORT_IDS.map(id => allProducts.find(p => p && p.id === id)).filter(Boolean);
-  if (topExportProducts.length < 6) {
-    topExportProducts = allProducts.slice(0, 6);
-  }
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState('All');
+
+  // Curate 2 to 3 featured products from each of the 4 Master Categories
+  const featuredProductsList = useMemo(() => {
+    const normalized = allProducts.map(normalizeProduct).filter(Boolean);
+    
+    // Group products by category
+    const grouped = {
+      'Indian Spices': [],
+      'Agro Commodities': [],
+      'Machinery': [],
+      'Pipes': []
+    };
+
+    normalized.forEach(p => {
+      const cat = p.category;
+      if (grouped[cat]) {
+        grouped[cat].push(p);
+      }
+    });
+
+    // Pick top 2-3 best from each category
+    const selected = [
+      // 2-3 Spices
+      ...grouped['Indian Spices'].slice(0, 3),
+      // 2-3 Agro Commodities
+      ...grouped['Agro Commodities'].slice(0, 3),
+      // 2-3 Machinery
+      ...grouped['Machinery'].slice(0, 3),
+      // 2-3 Pipes
+      ...grouped['Pipes'].slice(0, 3)
+    ];
+
+    if (selected.length === 0) {
+      return normalized.slice(0, 12);
+    }
+
+    return selected;
+  }, [allProducts]);
+
+  // Filtered by active tab on homepage
+  const displayedProducts = useMemo(() => {
+    if (activeCategoryFilter === 'All') {
+      return featuredProductsList;
+    }
+    return featuredProductsList.filter(p => p.category === activeCategoryFilter);
+  }, [featuredProductsList, activeCategoryFilter]);
+
+  const getCategoryIcon = (cat) => {
+    if (cat === 'Indian Spices') return <Flame size={13} style={{ color: '#EA580C' }} />;
+    if (cat === 'Agro Commodities') return <Wheat size={13} style={{ color: '#16A34A' }} />;
+    if (cat === 'Machinery') return <Cog size={13} style={{ color: '#0284C7' }} />;
+    if (cat === 'Pipes') return <Cylinder size={13} style={{ color: '#6366F1' }} />;
+    return <Sparkles size={13} style={{ color: 'var(--gold-deep)' }} />;
+  };
+
+  const getCategoryBadgeStyle = (cat) => {
+    if (cat === 'Indian Spices') return { bg: '#FFF7ED', color: '#C2410C', border: '#FFEDD5' };
+    if (cat === 'Agro Commodities') return { bg: '#F0FDF4', color: '#15803D', border: '#DCFCE7' };
+    if (cat === 'Machinery') return { bg: '#F0F9FF', color: '#0369A1', border: '#E0F2FE' };
+    if (cat === 'Pipes') return { bg: '#EEF2FF', color: '#4338CA', border: '#E0E7FF' };
+    return { bg: 'var(--gold-pale)', color: 'var(--gold-deep)', border: 'var(--gold-light)' };
+  };
 
   return (
-    <section className="py-50" id="products-section" style={{ background: '#FFFFFF', padding: '54px 0' }}>
+    <section className="py-50" id="products-section" style={{ background: '#FFFFFF', padding: '64px 0 74px' }}>
       <div className="container">
         
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '36px' }}>
           <div className="section-title">
-            <span className="eyebrow">
-              TOP EXPORT COMMODITIES FROM INDIA
+            <span className="eyebrow" style={{ letterSpacing: '1.8px' }}>
+              GLOBAL EXPORT PORTFOLIO & MULTI-SECTOR SUPPLY
             </span>
-            <h2 style={{ color: 'var(--navy)', marginTop: '12px' }}>
-              Our Featured <span style={{ color: 'var(--gold)' }}>Indian Commodities</span>
+            <h2 style={{ color: 'var(--navy)', marginTop: '12px', fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 900 }}>
+              Our Featured <span style={{ color: 'var(--gold)' }}>Export Categories & Products</span>
             </h2>
-            <p style={{ marginTop: '10px', color: 'var(--gray)', maxWidth: '600px', margin: '10px auto 0' }}>
-              India's most demanded premium export commodities — machine cleaned, Sortex sorted, and packed for international trade.
+            <p style={{ marginTop: '12px', color: 'var(--gray)', maxWidth: '680px', margin: '12px auto 0', fontSize: '15px', lineHeight: 1.6 }}>
+              Discover our core certified export verticals — from premium Indian spices and Sortex agro commodities to industrial processing machinery and pipeline infrastructure.
             </p>
           </div>
         </div>
 
-        {/* 6 Products Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '30px' }}>
-          {topExportProducts.map((item, idx) => (
-            <motion.div
-              key={item.id || idx}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: idx * 0.07 }}
-              style={{ 
-                background: '#FFFFFF', 
-                borderRadius: '24px', 
-                overflow: 'hidden', 
-                border: '1.5px solid var(--border)', 
-                boxShadow: '0 8px 30px rgba(200, 148, 10, 0.06)', 
-                display: 'flex', 
-                flexDirection: 'column',
-                transition: 'transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease'
-              }}
-              whileHover={{ y: -6, boxShadow: '0 20px 40px rgba(200, 148, 10, 0.2)', borderColor: 'var(--gold)' }}
-            >
-              {/* Product Image — Object-Fit Contain (Uncropped) */}
-              <div 
-                style={{ 
-                  height: '240px', 
-                  backgroundColor: '#FFFFFF', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  padding: '20px',
-                  borderBottom: '1px solid var(--border)',
-                  position: 'relative',
-                  cursor: 'pointer'
-                }}
-                onClick={() => onSelectProduct ? onSelectProduct(item) : null}
-              >
-                <img
-                  src={item.image}
-                  alt={item.title}
-                  loading="lazy"
-                  style={{
-                    maxWidth: '100%',
-                    maxHeight: '100%',
-                    objectFit: 'contain',
-                    transition: 'transform 0.4s ease'
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.06)'}
-                  onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                />
-              </div>
+        {/* Category Filter Chips */}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '40px' }}>
+          <button
+            onClick={() => setActiveCategoryFilter('All')}
+            style={{
+              padding: '9px 20px',
+              borderRadius: '100px',
+              border: activeCategoryFilter === 'All' ? '1.5px solid var(--navy)' : '1.5px solid var(--border)',
+              backgroundColor: activeCategoryFilter === 'All' ? 'var(--navy)' : '#F8FAFC',
+              color: activeCategoryFilter === 'All' ? '#FFFFFF' : '#475569',
+              fontWeight: 800,
+              fontSize: '13.5px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              boxShadow: activeCategoryFilter === 'All' ? '0 4px 14px rgba(0, 33, 71, 0.18)' : 'none'
+            }}
+          >
+            All Featured ({featuredProductsList.length})
+          </button>
 
-              {/* Product Body — Simplified (Title & Brief Description Only) */}
-              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', flex: 1 }}>
-                <h3 
-                  style={{ fontSize: '20px', fontWeight: 800, color: 'var(--navy)', marginBottom: '10px', lineHeight: 1.3, cursor: 'pointer' }}
+          {PRODUCT_CATEGORIES.map(cat => {
+            const isActive = activeCategoryFilter === cat;
+            const badge = getCategoryBadgeStyle(cat);
+            return (
+              <button
+                key={cat}
+                onClick={() => setActiveCategoryFilter(cat)}
+                style={{
+                  padding: '9px 20px',
+                  borderRadius: '100px',
+                  border: isActive ? `1.5px solid ${badge.color}` : '1.5px solid var(--border)',
+                  backgroundColor: isActive ? badge.bg : '#F8FAFC',
+                  color: isActive ? badge.color : '#475569',
+                  fontWeight: 800,
+                  fontSize: '13.5px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: isActive ? '0 4px 14px rgba(0,0,0,0.06)' : 'none'
+                }}
+              >
+                {getCategoryIcon(cat)}
+                <span>{cat}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 12 Products Grid (2-3 items from each of 4 categories) */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '26px' }}>
+          {displayedProducts.map((item, idx) => {
+            const badge = getCategoryBadgeStyle(item.category);
+            return (
+              <motion.div
+                key={item.id || idx}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.35, delay: (idx % 4) * 0.05 }}
+                style={{ 
+                  background: '#FFFFFF', 
+                  borderRadius: '22px', 
+                  overflow: 'hidden', 
+                  border: '1.5px solid var(--border)', 
+                  boxShadow: '0 8px 26px rgba(10, 34, 64, 0.05)', 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  transition: 'transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease'
+                }}
+                whileHover={{ y: -6, boxShadow: '0 18px 36px rgba(200, 148, 10, 0.18)', borderColor: 'var(--gold)' }}
+              >
+                {/* Product Image — Object-Fit Contain (Uncropped) */}
+                <div 
+                  style={{ 
+                    height: '220px', 
+                    backgroundColor: '#FFFFFF', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    padding: '20px',
+                    borderBottom: '1px solid var(--border)',
+                    position: 'relative',
+                    cursor: 'pointer'
+                  }}
                   onClick={() => onSelectProduct ? onSelectProduct(item) : null}
                 >
-                  {item.title}
-                </h3>
+                  <img
+                    src={item.image}
+                    alt={item.title}
+                    loading="lazy"
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                      objectFit: 'contain',
+                      transition: 'transform 0.4s ease'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.06)'}
+                    onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                  />
 
-                <p style={{ fontSize: '14px', color: 'var(--gray)', lineHeight: 1.6, marginBottom: '24px', flex: 1, fontWeight: 500 }}>
-                  {item.desc || item.description}
-                </p>
-
-                {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
-                  <button
-                    onClick={() => onOpenQuote ? onOpenQuote(item.title) : null}
-                    className="btn btn-primary"
-                    style={{ flex: 1, padding: '12px 18px', fontSize: '13.5px', justifyContent: 'center' }}
-                  >
-                    <span>Request Quote</span>
-                    <ArrowRight size={15} />
-                  </button>
-                  
-                  <button
-                    onClick={() => onSelectProduct ? onSelectProduct(item) : null}
-                    className="btn btn-outline"
-                    style={{ padding: '12px 18px', fontSize: '13.5px' }}
-                  >
-                    <Eye size={15} />
-                    <span>View</span>
-                  </button>
+                  {/* Category Pill Tag */}
+                  <span style={{
+                    position: 'absolute',
+                    top: '12px',
+                    right: '12px',
+                    backgroundColor: badge.bg,
+                    color: badge.color,
+                    border: `1px solid ${badge.border}`,
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    padding: '3px 10px',
+                    borderRadius: '100px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    {getCategoryIcon(item.category)}
+                    {item.category}
+                  </span>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+
+                {/* Product Body */}
+                <div style={{ padding: '22px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                  {item.subcategory && (
+                    <span style={{ fontSize: '11.5px', fontWeight: 800, color: 'var(--gold-deep)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '6px' }}>
+                      {item.subcategory}
+                    </span>
+                  )}
+
+                  <h3 
+                    style={{ fontSize: '18px', fontWeight: 800, color: 'var(--navy)', marginBottom: '8px', lineHeight: 1.3, cursor: 'pointer' }}
+                    onClick={() => onSelectProduct ? onSelectProduct(item) : null}
+                  >
+                    {item.title}
+                  </h3>
+
+                  <p style={{ fontSize: '13.5px', color: 'var(--gray)', lineHeight: 1.55, marginBottom: '20px', flex: 1, fontWeight: 500 }}>
+                    {item.desc || item.description}
+                  </p>
+
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+                    <button
+                      onClick={() => onOpenQuote ? onOpenQuote(item.title) : null}
+                      className="btn btn-primary"
+                      style={{ flex: 1, padding: '11px 14px', fontSize: '13px', justifyContent: 'center' }}
+                    >
+                      <span>Request Quote</span>
+                      <ArrowRight size={14} />
+                    </button>
+                    
+                    <button
+                      onClick={() => onSelectProduct ? onSelectProduct(item) : null}
+                      className="btn btn-outline"
+                      style={{ padding: '11px 14px', fontSize: '13px', justifyContent: 'center' }}
+                    >
+                      <Eye size={14} />
+                      <span>View</span>
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
 
         {/* View All Products CTA Link */}
@@ -135,9 +264,9 @@ export default function ProductsShowcaseSection({ onSelectProduct, onOpenQuote, 
           <button
             onClick={() => onNavigate ? onNavigate('products') : null}
             className="btn btn-primary"
-            style={{ padding: '14px 32px', fontSize: '15px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+            style={{ padding: '15px 36px', fontSize: '15px', display: 'inline-flex', alignItems: 'center', gap: '8px', borderRadius: '100px', boxShadow: '0 8px 24px rgba(0, 33, 71, 0.2)' }}
           >
-            <span>Explore Complete Product Categories Catalog</span>
+            <span>Explore Complete Multi-Category Catalog</span>
             <ArrowRight size={18} />
           </button>
         </div>
