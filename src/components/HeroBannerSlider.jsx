@@ -1,7 +1,8 @@
 import React from 'react';
 import { ArrowRight, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
-import heroBgVideo from '../assets/hero-bg.MOV';
+import heroBgVideo from '../assets/hero-bg.mp4';
+import heroPoster from '../assets/hero-poster.jpg';
 
 export default function HeroBannerSlider({ onOpenQuote, onNavigate }) {
   return (
@@ -19,13 +20,15 @@ export default function HeroBannerSlider({ onOpenQuote, onNavigate }) {
         padding: '78px 0 82px'
       }}
     >
-      {/* Background Video — Bright, Vibrant & Crystal Clear */}
+      {/* Background Video — Fast-Loading Web MP4 with Instant Poster */}
       <video 
         className="hero-video-bg" 
         autoPlay 
         loop 
         muted 
         playsInline
+        preload="auto"
+        poster={heroPoster}
         style={{ 
           position: 'absolute', 
           top: 0, 
@@ -39,7 +42,6 @@ export default function HeroBannerSlider({ onOpenQuote, onNavigate }) {
         }}
       >
         <source src={heroBgVideo} type="video/mp4" />
-        <source src={heroBgVideo} type="video/quicktime" />
       </video>
 
       {/* Clean Subtle Lighter Gradient Overlay with Radiant Glow */}
